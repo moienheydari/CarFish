@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   description: "A lightweight real-time chatroom competition platform.",
 };
 
+// The navigation reads the Supabase session from request cookies.
+export const instant = false;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
