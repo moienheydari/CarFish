@@ -1,7 +1,9 @@
 import { requireUser, getCurrentProfile } from "@/lib/auth";
+import { connection } from "next/server";
 import { ProfileForm } from "@/components/profile-form";
 
 export default async function ProfilePage() {
+  await connection();
   const user = await requireUser("/profile");
   const profile = await getCurrentProfile(user.id);
   return (

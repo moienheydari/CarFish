@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RoomsPage() {
+  await connection();
   await requireUser("/rooms");
   const supabase = await createClient();
   const { data: rooms } = await supabase

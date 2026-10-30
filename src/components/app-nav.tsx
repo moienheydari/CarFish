@@ -16,7 +16,7 @@ export async function AppNav() {
             ✦
           </span>
           <span>
-            Chat<span className="text-[var(--accent)]">Arena</span>
+            Car<span className="text-[var(--accent)]">Fish</span>
           </span>
         </Link>
         <div className="flex items-center gap-5 text-sm text-[var(--muted)]">

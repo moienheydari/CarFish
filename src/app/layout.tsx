@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { connection } from "next/server";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppNav } from "@/components/app-nav";
@@ -22,7 +23,13 @@ export const metadata: Metadata = {
 // The navigation reads the Supabase session from request cookies.
 export const instant = false;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  await connection();
+
   return (
     <html
       lang="en"

@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { RoomClient } from "@/components/room-client";
 import type { Message, Participant, Room } from "@/types/database";
@@ -8,6 +9,7 @@ export default async function RoomPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await connection();
   const user = await requireUser();
   const { id } = await params;
   const supabase = await createClient();

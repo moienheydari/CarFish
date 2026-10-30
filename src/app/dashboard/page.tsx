@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { requireUser, getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
+  await connection();
   const user = await requireUser();
   const profile = await getCurrentProfile(user.id);
   const supabase = await createClient();

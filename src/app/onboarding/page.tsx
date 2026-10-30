@@ -1,7 +1,9 @@
 import { requireUser, getCurrentProfile } from "@/lib/auth";
+import { connection } from "next/server";
 import { OnboardingForm } from "@/components/onboarding-form";
 
 export default async function OnboardingPage() {
+  await connection();
   const user = await requireUser("/onboarding");
   const profile = await getCurrentProfile(user.id);
   return (

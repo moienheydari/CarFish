@@ -1,7 +1,9 @@
 import { requireUser } from "@/lib/auth";
+import { connection } from "next/server";
 import { RoomForm } from "@/components/room-form";
 
 export default async function NewRoomPage() {
+  await connection();
   await requireUser("/rooms/new");
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-12">
