@@ -50,3 +50,11 @@ export const messageSchema = z.object({
     .min(1, "Message cannot be empty.")
     .max(500, "Message must be 500 characters or fewer."),
 });
+export const privateChatSchema = z.object({
+  recipient_id: z.string().uuid("Invalid player."),
+  game_code: z
+    .string()
+    .trim()
+    .length(4, "Game code must be exactly 4 characters.")
+    .regex(/^[A-Za-z0-9]+$/, "Invalid game code."),
+});

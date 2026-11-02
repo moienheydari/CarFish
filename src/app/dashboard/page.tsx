@@ -1,19 +1,65 @@
-import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser, getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
+import { GmPanel } from "@/components/gm-panel";
+import { PlayerPanel } from "@/components/player-panel";
+import type { Chat, Profile } from "@/types/database";
+
+export const instant = false;
 
 export default async function DashboardPage() {
   await connection();
   const user = await requireUser();
   const profile = await getCurrentProfile(user.id);
   const supabase = await createClient();
-  const { data: rooms } = await supabase
+  if (!profile)
+    return (
+      <main className="mx-auto flex-1 px-5 py-12">
+        <p className="text-rose-300">Complete your profile to enter the game.</p>
+        <a href="/profile" className="text-[var(--accent)] underline">
+          Go to profile
+        </a>
+      </main>
+    );
+
+  let { data: chatRows } = await supabase
     .from("chats")
-    .select("id,name,description,status,created_at")
-    .order("created_at", { ascending: false })
-    .limit(3);
+    .select("*")
+    .eq("game_code", profile.game_code)
+    .order("created_at", { ascending: true });
+  if (profile.is_gm && !chatRows?.some((chat) => chat.chat_type === "public")) {
+    await supabase.from("chats").insert({
+      game_code: profile.game_code,
+      name: "Public game chat",
+      description: "The shared conversation for this game.",
+      chat_type: "public",
+      created_by: user.id,
+    });
+    const refreshed = await supabase
+      .from("chats")
+      .select("*")
+      .eq("game_code", profile.game_code)
+      .order("created_at", { ascending: true });
+    chatRows = refreshed.data;
+  }
+  const { data: players } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("game_code", profile.game_code)
+    .eq("is_gm", false)
+    .order("display_name");
+  const { data: memberships } = await supabase
+    .from("chat_members")
+    .select("chat_id")
+    .eq("user_id", user.id);
+  const membershipIds = new Set((memberships ?? []).map((item) => item.chat_id));
+  const chats = (chatRows ?? []).filter(
+    (chat) =>
+      profile.is_gm ||
+      (chat.status === "open" &&
+        (chat.chat_type === "public" || membershipIds.has(chat.id))),
+  ) as Chat[];
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12">
       <div className="flex flex-wrap items-end justify-between gap-5">
@@ -23,46 +69,22 @@ export default async function DashboardPage() {
             Good to see you, {profile?.display_name ?? "friend"}.
           </h1>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/chats/new"
-            className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505]"
-          >
-            Create a chat
-          </Link>
-          <SignOutButton />
-        </div>
+        <SignOutButton />
       </div>
-      <section className="mt-12">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Fresh chats</h2>
-          <Link href="/chats" className="text-sm text-[var(--accent)]">
-            View all →
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {(rooms ?? []).map((room) => (
-            <Link
-              key={room.id}
-              href={`/chats/${room.id}`}
-              className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 transition hover:-translate-y-1 hover:border-[var(--accent)]"
-            >
-              <span className="text-xs uppercase tracking-wider text-[var(--accent)]">
-                {room.status}
-              </span>
-              <h3 className="mt-3 font-semibold">{room.name}</h3>
-              <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">
-                {room.description || "A new room ready for ideas."}
-              </p>
-            </Link>
-          ))}
-          {!rooms?.length && (
-            <div className="rounded-2xl border border-dashed border-[var(--line)] p-8 text-[var(--muted)]">
-              No chats yet. Create the first one.
-            </div>
-          )}
-        </div>
-      </section>
+      {profile.is_gm ? (
+        <GmPanel
+          players={(players ?? []) as Profile[]}
+          chats={chats}
+          currentUserId={user.id}
+        />
+      ) : (
+        <PlayerPanel
+          players={(players ?? []) as Profile[]}
+          initialChats={chats}
+          currentUserId={user.id}
+          gameCode={profile.game_code}
+        />
+      )}
     </main>
   );
 }

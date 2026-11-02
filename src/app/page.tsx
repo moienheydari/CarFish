@@ -3,6 +3,8 @@ import Image from "next/image";
 import { getCurrentUser } from "@/lib/auth";
 import logo from "@/images/logo.png";
 
+export const instant = false;
+
 export default async function Home() {
   const user = await getCurrentUser();
   return (
