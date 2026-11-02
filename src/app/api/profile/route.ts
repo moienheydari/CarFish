@@ -25,13 +25,8 @@ export async function PUT(request: Request) {
     .single();
   if (error)
     return NextResponse.json(
-      {
-        error:
-          error.code === "23505"
-            ? "That username is already taken."
-            : "Could not save profile.",
-      },
-      { status: error.code === "23505" ? 409 : 500 },
+      { error: "Could not save profile." },
+      { status: 500 },
     );
   return NextResponse.json(data);
 }

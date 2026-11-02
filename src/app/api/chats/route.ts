@@ -15,7 +15,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("chats")
     .select(
-      "*, host:profiles!chats_created_by_fkey(username,display_name), chat_members(count)",
+      "*, host:profiles!chats_created_by_fkey(display_name), chat_members(count)",
     )
     .order("created_at", { ascending: false });
   if (error)

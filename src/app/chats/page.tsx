@@ -10,7 +10,7 @@ export default async function ChatsPage() {
   const { data: rooms } = await supabase
     .from("chats")
     .select(
-      "id,name,description,game_code,chat_type,status,created_at,host:profiles!chats_created_by_fkey(username),chat_members(count)",
+      "id,name,description,game_code,chat_type,status,created_at,host:profiles!chats_created_by_fkey(display_name),chat_members(count)",
     )
     .order("created_at", { ascending: false });
   return (
@@ -48,7 +48,7 @@ export default async function ChatsPage() {
             </p>
             <p className="mt-6 text-xs text-[var(--muted)]">
               Hosted by @
-              {(room.host as { username?: string } | null)?.username ??
+              {(room.host as { display_name?: string } | null)?.display_name ??
                 "unknown"}
             </p>
           </Link>

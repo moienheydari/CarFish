@@ -15,7 +15,7 @@ export default async function RoomPage({
   const supabase = await createClient();
   const { data: room } = await supabase
     .from("chats")
-    .select("*, host:profiles!chats_created_by_fkey(username,display_name)")
+    .select("*, host:profiles!chats_created_by_fkey(display_name)")
     .eq("id", id)
     .single();
   if (!room)
@@ -34,7 +34,7 @@ export default async function RoomPage({
     ? await supabase
         .from("messages")
         .select(
-          "*, sender:profiles!messages_sender_id_fkey(username,display_name)",
+          "*, sender:profiles!messages_sender_id_fkey(display_name)",
         )
         .eq("chat_id", id)
         .order("created_at", { ascending: false })
@@ -42,7 +42,7 @@ export default async function RoomPage({
     : { data: [] };
   const { data: participants } = await supabase
     .from("chat_members")
-    .select("user_id,joined_at,profile:profiles(username,display_name,profile_image_url)")
+    .select("user_id,joined_at,profile:profiles(display_name,profile_image_url)")
     .eq("chat_id", id);
   const normalizedParticipants: Participant[] = (participants ?? []).map(
     (participant) => ({

@@ -20,7 +20,7 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm text-[var(--accent)]">Your arena</p>
           <h1 className="mt-2 text-4xl font-bold">
-            Good to see you, {profile?.username ?? "friend"}.
+            Good to see you, {profile?.display_name ?? "friend"}.
           </h1>
         </div>
         <div className="flex items-center gap-3">

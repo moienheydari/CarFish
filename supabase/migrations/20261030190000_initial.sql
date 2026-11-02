@@ -16,23 +16,21 @@ create type public.chat_status as enum ('open', 'locked');
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  username text unique,
-  username_normalized text generated always as (lower(username)) stored unique,
   display_name text,
   profile_image_url text,
   bio text,
   is_gm boolean not null default false,
+  game_code varchar(4) not null check (game_code ~ '^[A-Za-z0-9]{4}$') default 'FREE',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint username_format check (username is null or username ~ '^[A-Za-z0-9_]{3,20}$'),
-  constraint display_name_length check (display_name is null or char_length(display_name) <= 50),
+  constraint display_name_length check (display_name is null or char_length(display_name) between 1 and 50),
   constraint profile_image_url_length check (profile_image_url is null or char_length(profile_image_url) <= 2048),
   constraint bio_length check (bio is null or char_length(bio) <= 280)
 );
 
 create table public.chats (
   id uuid primary key default gen_random_uuid(),
-  game_code varchar(5) not null check (game_code ~ '^[A-Za-z0-9]{5}$'),
+  game_code varchar(4) not null check (game_code ~ '^[A-Za-z0-9]{4}$'),
   name text not null check (char_length(name) between 3 and 60),
   description text check (description is null or char_length(description) <= 280),
   created_by uuid not null references public.profiles(id) on delete restrict,
@@ -52,7 +50,6 @@ create table public.chat_members (
 create table public.messages (
   id uuid primary key default gen_random_uuid(),
   chat_id uuid not null references public.chats(id) on delete cascade,
-  game_code varchar(5) not null check (game_code ~ '^[A-Za-z0-9]{5}$'),
   sender_id uuid not null references public.profiles(id) on delete restrict,
   content text not null check (char_length(trim(content)) between 1 and 500),
   created_at timestamptz not null default now()
@@ -62,7 +59,6 @@ create index chats_game_code_created_at_idx on public.chats(game_code, created_a
 create index chats_created_at_idx on public.chats(created_at desc);
 create index chat_members_user_id_idx on public.chat_members(user_id);
 create index messages_chat_created_at_idx on public.messages(chat_id, created_at desc);
-create index messages_game_code_created_at_idx on public.messages(game_code, created_at desc);
 
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql
@@ -80,20 +76,6 @@ begin
   if new.is_gm is distinct from old.is_gm
      and current_user not in ('postgres', 'service_role') then
     raise exception 'Only a trusted server can change is_gm';
-  end if;
-  return new;
-end;
-$$;
-
-create or replace function public.set_message_game_code() returns trigger
-language plpgsql
-as $$
-declare
-  chat_game_code varchar(5);
-begin
-  select game_code into chat_game_code from public.chats where id = new.chat_id;
-  if chat_game_code is null or new.game_code <> chat_game_code then
-    raise exception 'Message game code must match its chat game code';
   end if;
   return new;
 end;
@@ -117,8 +99,6 @@ create trigger profiles_role_fields before update on public.profiles
 for each row execute function public.protect_profile_role_fields();
 create trigger chats_updated_at before update on public.chats
 for each row execute function public.touch_updated_at();
-create trigger messages_game_code before insert or update on public.messages
-for each row execute function public.set_message_game_code();
 create trigger private_chat_members_limit before insert on public.chat_members
 for each row execute function public.enforce_private_chat_members_limit();
 

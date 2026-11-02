@@ -5,7 +5,7 @@ For Development : https://supabase.com/dashboard/project/xnzwlzgpkrvfvmkqpqhk/au
 
 # ChatArena
 
-ChatArena is a Next.js App Router MVP for real-time game chats. It uses Supabase Auth, PostgreSQL, RLS, and Realtime. Chats are public or private, belong to a five-character game code, and can be open or locked.
+ChatArena is a Next.js App Router MVP for real-time game chats. It uses Supabase Auth, PostgreSQL, RLS, and Realtime. Chats are public or private, belong to a four-character game code, and can be open or locked.
 
 ## Local setup
 

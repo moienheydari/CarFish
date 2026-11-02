@@ -43,7 +43,7 @@ export function ChatClient({
           const { data } = await supabase
             .from("messages")
             .select(
-              "*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)",
+              "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
             )
             .eq("id", payload.new.id)
             .single();
@@ -180,9 +180,7 @@ export function ChatClient({
                 }
               >
                 <p className="mb-1 text-xs text-[var(--muted)]">
-                  {message.sender?.display_name ||
-                    message.sender?.username ||
-                    "participant"}{" "}
+                  {message.sender?.display_name || "participant"}{" "}
                   ·{" "}
                   {new Date(message.created_at).toLocaleTimeString([], {
                     hour: "numeric",
@@ -241,7 +239,7 @@ export function ChatClient({
           <span className="text-[var(--muted)]">({participants.length})</span>
         </p>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Host · @{room.host?.username ?? "unknown"}
+          Host · {room.host?.display_name ?? "unknown"}
         </p>
         <div className="mt-5 space-y-3">
           {participants.map((participant) => (
@@ -250,12 +248,10 @@ export function ChatClient({
               className="flex items-center gap-3 text-sm"
             >
               <span className="grid size-8 place-items-center rounded-full bg-[#2a0a0a] text-xs">
-                {(participant.profile?.username ?? "?")[0]?.toUpperCase()}
+                {(participant.profile?.display_name ?? "?")[0]?.toUpperCase()}
               </span>
               <span>
-                {participant.profile?.display_name ||
-                  participant.profile?.username ||
-                  "participant"}
+                {participant.profile?.display_name || "participant"}
                 {participant.user_id === room.created_by && (
                   <span className="ml-2 text-xs text-[var(--accent)]">
                     host

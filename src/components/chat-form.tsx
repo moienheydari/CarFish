@@ -37,8 +37,8 @@ export function ChatForm() {
           onChange={(e) =>
             setValues({ ...values, game_code: e.target.value.toUpperCase() })
           }
-          minLength={5}
-          maxLength={5}
+          minLength={4}
+          maxLength={4}
           required
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 uppercase outline-none focus:border-[var(--accent)]"
           placeholder="ABCDE"

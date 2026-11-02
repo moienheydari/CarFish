@@ -18,7 +18,7 @@ export async function GET(
   const before = new URL(request.url).searchParams.get("before");
   let query = supabase
     .from("messages")
-    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)")
+    .select("*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)")
     .eq("chat_id", id)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -51,22 +51,14 @@ export async function POST(
       { status: 400 },
     );
   const { id } = await params;
-  const { data: chat, error: chatError } = await supabase
-    .from("chats")
-    .select("game_code")
-    .eq("id", id)
-    .single();
-  if (chatError || !chat)
-    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   const { data, error } = await supabase
     .from("messages")
     .insert({
       chat_id: id,
-      game_code: chat.game_code,
       sender_id: user.id,
       content: parsed.data.content,
     })
-    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)")
+    .select("*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)")
     .single();
   if (error)
     return NextResponse.json(

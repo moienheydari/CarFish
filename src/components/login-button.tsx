@@ -61,7 +61,7 @@ export function LoginButton({
 
     const { data: profile, error: profileReadError } = await supabase
       .from("profiles")
-      .select("username")
+      .select("display_name")
       .eq("id", result.data.user.id)
       .maybeSingle();
     if (profileReadError) {
@@ -70,7 +70,7 @@ export function LoginButton({
       return;
     }
 
-    router.push(profile?.username ? requestedDestination : "/profile");
+    router.push(profile?.display_name ? requestedDestination : "/profile");
   }
 
   async function loginWithGoogle() {

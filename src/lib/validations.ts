@@ -1,19 +1,11 @@
 import { z } from "zod";
 
-export const usernameSchema = z
-  .string()
-  .trim()
-  .min(3, "Username must be at least 3 characters.")
-  .max(20, "Username must be 20 characters or fewer.")
-  .regex(/^[A-Za-z0-9_]+$/, "Use only letters, numbers, and underscores.");
 export const profileSchema = z.object({
-  username: usernameSchema,
   display_name: z
     .string()
     .trim()
-    .max(50, "Display name is too long.")
-    .optional()
-    .default(""),
+    .min(1, "Display name is required.")
+    .max(50, "Display name is too long."),
   bio: z
     .string()
     .trim()
@@ -26,12 +18,17 @@ export const profileSchema = z.object({
     .max(2048, "Profile image URL is too long.")
     .optional()
     .default(""),
+  game_code: z
+    .string()
+    .trim()
+    .length(4, "Game code must be exactly 4 characters.")
+    .regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
 });
 export const chatSchema = z.object({
   game_code: z
     .string()
     .trim()
-    .length(5, "Game code must be exactly 5 characters.")
+    .length(4, "Game code must be exactly 4 characters.")
     .regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
   name: z
     .string()

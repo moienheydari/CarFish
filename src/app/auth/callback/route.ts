@@ -17,10 +17,10 @@ export async function GET(request: Request) {
         .upsert({ id: user.id }, { onConflict: "id", ignoreDuplicates: true });
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username")
+        .select("display_name")
         .eq("id", user.id)
         .maybeSingle();
-      const destination = profile?.username
+      const destination = profile?.display_name
         ? next?.startsWith("/")
           ? next
           : "/dashboard"
