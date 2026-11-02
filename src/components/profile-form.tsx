@@ -26,8 +26,9 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
     const result = await response.json();
     if (!response.ok) setError(result.error);
     else {
-      setMessage("Profile saved.");
-      router.refresh();
+      setMessage("Profile saved successfully!");
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      router.push("/dashboard");
     }
     setBusy(false);
   }
@@ -39,7 +40,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           value={values.username}
           onChange={(e) => setValues({ ...values, username: e.target.value })}
           required
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
       </label>
       <label className="block text-sm font-medium">
@@ -50,7 +51,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
             setValues({ ...values, display_name: e.target.value })
           }
           maxLength={50}
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
       </label>
       <label className="block text-sm font-medium">
@@ -60,7 +61,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           onChange={(e) => setValues({ ...values, bio: e.target.value })}
           maxLength={280}
           rows={4}
-          className="mt-2 w-full resize-none rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className="mt-2 w-full resize-none rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
       </label>
       <div className="flex items-center gap-4">
@@ -76,7 +77,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         )}
         <button
           disabled={busy}
-          className="ml-auto rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#07111f] disabled:opacity-50"
+          className="ml-auto rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] disabled:opacity-50"
         >
           {busy ? "Saving..." : "Save profile"}
         </button>

@@ -33,7 +33,7 @@ export function RoomForm() {
           minLength={3}
           maxLength={60}
           required
-          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
           placeholder="Friday Night Ideas"
         />
       </label>
@@ -47,7 +47,7 @@ export function RoomForm() {
           }
           maxLength={280}
           rows={4}
-          className="mt-2 w-full resize-none rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          className="mt-2 w-full resize-none rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
           placeholder="What are we here to explore?"
         />
       </label>
@@ -58,7 +58,7 @@ export function RoomForm() {
       )}
       <button
         disabled={busy}
-        className="w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#07111f] disabled:opacity-50"
+        className="w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] disabled:opacity-50"
       >
         {busy ? "Creating..." : "Create room"}
       </button>

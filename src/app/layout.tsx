@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChatArena | Rooms for bold conversations",
-  description: "A lightweight real-time chatroom competition platform.",
+  title: "RatFish",
+  description: "A chatroom game platform.",
 };
 
 // The navigation reads the Supabase session from request cookies.
@@ -36,7 +36,6 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AppNav />
         {children}
       </body>
     </html>

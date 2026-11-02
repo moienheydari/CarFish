@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { requireUser, getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export default async function DashboardPage() {
   await connection();
@@ -22,12 +23,15 @@ export default async function DashboardPage() {
             Good to see you, {profile?.username ?? "friend"}.
           </h1>
         </div>
-        <Link
-          href="/rooms/new"
-          className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#07111f]"
-        >
-          Create a room
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/rooms/new"
+            className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505]"
+          >
+            Create a room
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
       <section className="mt-12">
         <div className="mb-5 flex items-center justify-between">

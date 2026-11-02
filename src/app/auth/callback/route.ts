@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         ? next?.startsWith("/")
           ? next
           : "/dashboard"
-        : "/onboarding";
+        : "/profile";
       return NextResponse.redirect(new URL(destination, url.origin));
     }
   }

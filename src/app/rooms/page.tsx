@@ -22,7 +22,7 @@ export default async function RoomsPage() {
         </div>
         <Link
           href="/rooms/new"
-          className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#07111f]"
+          className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505]"
         >
           New room
         </Link>

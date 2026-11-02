@@ -161,7 +161,7 @@ export function RoomClient({
               {!member && (
                 <button
                   onClick={join}
-                  className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[#07111f]"
+                  className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[#050505]"
                 >
                   Join room
                 </button>
@@ -193,7 +193,7 @@ export function RoomClient({
                   })}
                 </p>
                 <p
-                  className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${message.sender_id === currentUserId ? "rounded-tr-sm bg-[var(--accent)] text-[#07111f]" : "rounded-tl-sm bg-[#18304a]"}`}
+                  className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${message.sender_id === currentUserId ? "rounded-tr-sm bg-[var(--accent)] text-[#050505]" : "rounded-tl-sm bg-[#2a0a0a]"}`}
                 >
                   {message.content}
                 </p>
@@ -221,11 +221,11 @@ export function RoomClient({
                 maxLength={500}
                 rows={1}
                 placeholder="Write a message..."
-                className="min-w-0 flex-1 resize-none rounded-xl border border-[var(--line)] bg-[#07111f] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                className="min-w-0 flex-1 resize-none rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
               />
               <button
                 disabled={busy}
-                className="rounded-xl bg-[var(--accent)] px-4 font-semibold text-[#07111f] disabled:opacity-50"
+                className="rounded-xl bg-[var(--accent)] px-4 font-semibold text-[#050505] disabled:opacity-50"
               >
                 Send
               </button>
@@ -252,7 +252,7 @@ export function RoomClient({
               key={participant.user_id}
               className="flex items-center gap-3 text-sm"
             >
-              <span className="grid size-8 place-items-center rounded-full bg-[#18304a] text-xs">
+              <span className="grid size-8 place-items-center rounded-full bg-[#2a0a0a] text-xs">
                 {(participant.profile?.username ?? "?")[0]?.toUpperCase()}
               </span>
               <span>
