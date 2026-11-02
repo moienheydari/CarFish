@@ -28,11 +28,13 @@ export default async function DashboardPage() {
     .select("*")
     .eq("game_code", profile.game_code)
     .order("created_at", { ascending: true });
+
+  // If the user is a GM and there are no public chats, create one
   if (profile.is_gm && !chatRows?.some((chat) => chat.chat_type === "public")) {
     await supabase.from("chats").insert({
       game_code: profile.game_code,
       name: "Public game chat",
-      description: "The shared conversation for this game.",
+      description: "The shared chat for this game (${{ profile.game_code }}).",
       chat_type: "public",
       created_by: user.id,
     });
@@ -43,22 +45,21 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: true });
     chatRows = refreshed.data;
   }
+
   const { data: players } = await supabase
     .from("profiles")
     .select("*")
     .eq("game_code", profile.game_code)
     .eq("is_gm", false)
     .order("display_name");
-  const { data: memberships } = await supabase
+  const { data: userChats } = await supabase
     .from("chat_members")
-    .select("chat_id")
-    .eq("user_id", user.id);
-  const membershipIds = new Set((memberships ?? []).map((item) => item.chat_id));
+    .select("chat_id,user_id");
+  const userChatsIds = new Set((userChats ?? []).map((item) => item.chat_id));
   const chats = (chatRows ?? []).filter(
     (chat) =>
       profile.is_gm ||
-      (chat.status === "open" &&
-        (chat.chat_type === "public" || membershipIds.has(chat.id))),
+      (chat.chat_type === "public" || userChatsIds.has(chat.id)),
   ) as Chat[];
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12">
@@ -81,6 +82,7 @@ export default async function DashboardPage() {
         <PlayerPanel
           players={(players ?? []) as Profile[]}
           initialChats={chats}
+          initialChatMembers={userChats ?? []}
           currentUserId={user.id}
           gameCode={profile.game_code}
         />

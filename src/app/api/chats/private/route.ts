@@ -22,6 +22,12 @@ export async function POST(request: Request) {
     );
 
   const gameCode = parsed.data.game_code.toUpperCase();
+  if (parsed.data.recipient_id === user.id)
+    return NextResponse.json(
+      { error: "You cannot create a private chat with yourself." },
+      { status: 400 },
+    );
+
   const { data: participants } = await supabase
     .from("profiles")
     .select("id,game_code,is_gm")
@@ -41,6 +47,33 @@ export async function POST(request: Request) {
       { error: "Private chats are limited to players in your game." },
       { status: 403 },
     );
+
+  const { data: sharedMemberships } = await supabase
+    .from("chat_members")
+    .select("chat_id,user_id")
+    .in("user_id", [user.id, parsed.data.recipient_id]);
+  const sharedChatIds = [
+    ...new Set((sharedMemberships ?? []).map((membership) => membership.chat_id)),
+  ].filter(
+    (chatId) =>
+      new Set(
+        (sharedMemberships ?? [])
+          .filter((membership) => membership.chat_id === chatId)
+          .map((membership) => membership.user_id),
+      ).size === 2,
+  );
+  if (sharedChatIds.length) {
+    const { data: existingChat } = await supabase
+      .from("chats")
+      .select("*")
+      .in("id", sharedChatIds)
+      .eq("chat_type", "private")
+      .eq("game_code", gameCode)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingChat) return NextResponse.json(existingChat);
+  }
 
   const { data: chat, error } = await supabase
     .from("chats")
