@@ -15,11 +15,11 @@ export async function POST(
     );
   const { id } = await params;
   const { error } = await supabase
-    .from("room_members")
-    .insert({ room_id: id, user_id: user.id });
+    .from("chat_members")
+    .insert({ chat_id: id, user_id: user.id });
   if (error && error.code !== "23505")
     return NextResponse.json(
-      { error: "Could not join this room." },
+      { error: "Could not join this chat." },
       { status: 400 },
     );
   return NextResponse.json({ ok: true });

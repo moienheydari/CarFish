@@ -1,8 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-export function RoomForm() {
-  const [values, setValues] = useState({ name: "", description: "" });
+export function ChatForm() {
+  const [values, setValues] = useState({
+    game_code: "",
+    name: "",
+    description: "",
+    chat_type: "public" as "public" | "private",
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -10,7 +15,7 @@ export function RoomForm() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const response = await fetch("/api/rooms", {
+    const response = await fetch("/api/chats", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
@@ -21,12 +26,26 @@ export function RoomForm() {
       setBusy(false);
       return;
     }
-    router.push(`/rooms/${result.id}`);
+    router.push(`/chats/${result.id}`);
   }
   return (
     <form onSubmit={submit} className="space-y-5">
       <label className="block text-sm font-medium">
-        Room name
+        Game code
+        <input
+          value={values.game_code}
+          onChange={(e) =>
+            setValues({ ...values, game_code: e.target.value.toUpperCase() })
+          }
+          minLength={5}
+          maxLength={5}
+          required
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 uppercase outline-none focus:border-[var(--accent)]"
+          placeholder="ABCDE"
+        />
+      </label>
+      <label className="block text-sm font-medium">
+        Chat name
         <input
           value={values.name}
           onChange={(e) => setValues({ ...values, name: e.target.value })}
@@ -36,6 +55,22 @@ export function RoomForm() {
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
           placeholder="Friday Night Ideas"
         />
+      </label>
+      <label className="block text-sm font-medium">
+        Chat type
+        <select
+          value={values.chat_type}
+          onChange={(e) =>
+            setValues({
+              ...values,
+              chat_type: e.target.value as "public" | "private",
+            })
+          }
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+        >
+          <option value="public">Public - everyone in the game</option>
+          <option value="private">Private - two players</option>
+        </select>
       </label>
       <label className="block text-sm font-medium">
         Description{" "}
@@ -60,7 +95,7 @@ export function RoomForm() {
         disabled={busy}
         className="w-full rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] disabled:opacity-50"
       >
-        {busy ? "Creating..." : "Create room"}
+        {busy ? "Creating..." : "Create chat"}
       </button>
     </form>
   );

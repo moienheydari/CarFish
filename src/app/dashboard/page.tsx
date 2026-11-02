@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const profile = await getCurrentProfile(user.id);
   const supabase = await createClient();
   const { data: rooms } = await supabase
-    .from("rooms")
+    .from("chats")
     .select("id,name,description,status,created_at")
     .order("created_at", { ascending: false })
     .limit(3);
@@ -25,18 +25,18 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/rooms/new"
+            href="/chats/new"
             className="rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505]"
           >
-            Create a room
+            Create a chat
           </Link>
           <SignOutButton />
         </div>
       </div>
       <section className="mt-12">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Fresh rooms</h2>
-          <Link href="/rooms" className="text-sm text-[var(--accent)]">
+          <h2 className="text-xl font-semibold">Fresh chats</h2>
+          <Link href="/chats" className="text-sm text-[var(--accent)]">
             View all →
           </Link>
         </div>
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
           {(rooms ?? []).map((room) => (
             <Link
               key={room.id}
-              href={`/rooms/${room.id}`}
+              href={`/chats/${room.id}`}
               className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 transition hover:-translate-y-1 hover:border-[var(--accent)]"
             >
               <span className="text-xs uppercase tracking-wider text-[var(--accent)]">
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
           ))}
           {!rooms?.length && (
             <div className="rounded-2xl border border-dashed border-[var(--line)] p-8 text-[var(--muted)]">
-              No rooms yet. Create the first one.
+              No chats yet. Create the first one.
             </div>
           )}
         </div>

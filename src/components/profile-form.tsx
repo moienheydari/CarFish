@@ -7,6 +7,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   const [values, setValues] = useState({
     username: profile?.username ?? "",
     display_name: profile?.display_name ?? "",
+    profile_image_url: profile?.profile_image_url ?? "",
     bio: profile?.bio ?? "",
   });
   const [message, setMessage] = useState("");
@@ -52,6 +53,19 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           }
           maxLength={50}
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+        />
+      </label>
+      <label className="block text-sm font-medium">
+        Profile image URL
+        <input
+          type="url"
+          value={values.profile_image_url}
+          onChange={(e) =>
+            setValues({ ...values, profile_image_url: e.target.value })
+          }
+          maxLength={2048}
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          placeholder="https://example.com/avatar.png"
         />
       </label>
       <label className="block text-sm font-medium">

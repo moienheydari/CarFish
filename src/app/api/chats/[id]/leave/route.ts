@@ -15,13 +15,13 @@ export async function POST(
     );
   const { id } = await params;
   const { error } = await supabase
-    .from("room_members")
+    .from("chat_members")
     .delete()
-    .eq("room_id", id)
+    .eq("chat_id", id)
     .eq("user_id", user.id);
   if (error)
     return NextResponse.json(
-      { error: "Could not leave this room." },
+      { error: "Could not leave this chat." },
       { status: 400 },
     );
   return NextResponse.json({ ok: true });

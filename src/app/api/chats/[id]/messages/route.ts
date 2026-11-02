@@ -18,8 +18,8 @@ export async function GET(
   const before = new URL(request.url).searchParams.get("before");
   let query = supabase
     .from("messages")
-    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name)")
-    .eq("room_id", id)
+    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)")
+    .eq("chat_id", id)
     .order("created_at", { ascending: false })
     .limit(50);
   if (before) query = query.lt("created_at", before);
@@ -51,14 +51,26 @@ export async function POST(
       { status: 400 },
     );
   const { id } = await params;
+  const { data: chat, error: chatError } = await supabase
+    .from("chats")
+    .select("game_code")
+    .eq("id", id)
+    .single();
+  if (chatError || !chat)
+    return NextResponse.json({ error: "Chat not found." }, { status: 404 });
   const { data, error } = await supabase
     .from("messages")
-    .insert({ room_id: id, sender_id: user.id, content: parsed.data.content })
-    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name)")
+    .insert({
+      chat_id: id,
+      game_code: chat.game_code,
+      sender_id: user.id,
+      content: parsed.data.content,
+    })
+    .select("*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)")
     .single();
   if (error)
     return NextResponse.json(
-      { error: "You must join this room before sending messages." },
+      { error: "You must join this chat before sending messages." },
       { status: 403 },
     );
   return NextResponse.json(data, { status: 201 });

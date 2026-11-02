@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { roomSchema } from "@/lib/validations";
+import { chatSchema } from "@/lib/validations";
 
 export async function GET() {
   const supabase = await createClient();
@@ -13,14 +13,14 @@ export async function GET() {
       { status: 401 },
     );
   const { data, error } = await supabase
-    .from("rooms")
+    .from("chats")
     .select(
-      "*, host:profiles!rooms_created_by_fkey(username,display_name), room_members(count)",
+      "*, host:profiles!chats_created_by_fkey(username,display_name), chat_members(count)",
     )
     .order("created_at", { ascending: false });
   if (error)
     return NextResponse.json(
-      { error: "Unable to load rooms." },
+      { error: "Unable to load chats." },
       { status: 500 },
     );
   return NextResponse.json(data);
@@ -36,33 +36,35 @@ export async function POST(request: Request) {
       { error: "Authentication required." },
       { status: 401 },
     );
-  const parsed = roomSchema.safeParse(await request.json());
+  const parsed = chatSchema.safeParse(await request.json());
   if (!parsed.success)
     return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid room." },
+      { error: parsed.error.issues[0]?.message ?? "Invalid chat." },
       { status: 400 },
     );
-  const { data: room, error } = await supabase
-    .from("rooms")
+  const { data: chat, error } = await supabase
+    .from("chats")
     .insert({
+      game_code: parsed.data.game_code.toUpperCase(),
       name: parsed.data.name,
       description: parsed.data.description || null,
+      chat_type: parsed.data.chat_type,
       created_by: user.id,
     })
     .select()
     .single();
-  if (error || !room)
+  if (error || !chat)
     return NextResponse.json(
-      { error: "Could not create room." },
+      { error: "Could not create chat." },
       { status: 500 },
     );
   const { error: memberError } = await supabase
-    .from("room_members")
-    .insert({ room_id: room.id, user_id: user.id });
+    .from("chat_members")
+    .insert({ chat_id: chat.id, user_id: user.id });
   if (memberError)
     return NextResponse.json(
-      { error: "Room created but membership could not be initialized." },
+      { error: "Chat created but membership could not be initialized." },
       { status: 500 },
     );
-  return NextResponse.json(room, { status: 201 });
+  return NextResponse.json(chat, { status: 201 });
 }

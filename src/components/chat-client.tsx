@@ -2,16 +2,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
-import type { Message, Participant, Room } from "@/types/database";
+import type { Chat, Message, Participant } from "@/types/database";
 
-export function RoomClient({
+export function ChatClient({
   room: initialRoom,
   initialMessages,
   participants: initialParticipants,
   currentUserId,
   initialMember,
 }: {
-  room: Room;
+  room: Chat;
   initialMessages: Message[];
   participants: Participant[];
   currentUserId: string;
@@ -30,20 +30,20 @@ export function RoomClient({
     if (!member) return;
     const supabase = createClient();
     const channel = supabase
-      .channel(`room-${room.id}`)
+      .channel(`chat-${room.id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: `room_id=eq.${room.id}`,
+          filter: `chat_id=eq.${room.id}`,
         },
         async (payload) => {
           const { data } = await supabase
             .from("messages")
             .select(
-              "*, sender:profiles!messages_sender_id_fkey(username,display_name)",
+              "*, sender:profiles!messages_sender_id_fkey(username,display_name,profile_image_url)",
             )
             .eq("id", payload.new.id)
             .single();
@@ -60,7 +60,7 @@ export function RoomClient({
         {
           event: "UPDATE",
           schema: "public",
-          table: "rooms",
+          table: "chats",
           filter: `id=eq.${room.id}`,
         },
         (payload) => setRoom((old) => ({ ...old, status: payload.new.status })),
@@ -74,7 +74,7 @@ export function RoomClient({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
   async function join() {
-    const response = await fetch(`/api/rooms/${room.id}/join`, {
+    const response = await fetch(`/api/chats/${room.id}/join`, {
       method: "POST",
     });
     if (response.ok) {
@@ -83,20 +83,20 @@ export function RoomClient({
     }
   }
   async function leave() {
-    const response = await fetch(`/api/rooms/${room.id}/leave`, {
+    const response = await fetch(`/api/chats/${room.id}/leave`, {
       method: "POST",
     });
     if (response.ok) {
       setMember(false);
-      router.push("/rooms");
-    } else setError("The host cannot leave their own room.");
+      router.push("/chats");
+    } else setError("The host cannot leave their own chat.");
   }
   async function send(event: React.FormEvent) {
     event.preventDefault();
     if (!content.trim() || busy) return;
     setBusy(true);
     setError("");
-    const response = await fetch(`/api/rooms/${room.id}/messages`, {
+    const response = await fetch(`/api/chats/${room.id}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
@@ -110,8 +110,8 @@ export function RoomClient({
     } else setError(result.error);
     setBusy(false);
   }
-  async function transition(status: "active" | "finished") {
-    const response = await fetch(`/api/rooms/${room.id}/state`, {
+  async function transition(status: "open" | "locked") {
+    const response = await fetch(`/api/chats/${room.id}/state`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
@@ -127,27 +127,24 @@ export function RoomClient({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-[var(--accent)]">
-                {room.status}
+                {room.chat_type} · {room.status} · game {room.game_code}
               </p>
               <h1 className="mt-1 text-2xl font-bold">{room.name}</h1>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                {room.description || "No room description."}
+                {room.description || "No chat description."}
               </p>
             </div>
             <div className="flex gap-2">
-              {room.created_by === currentUserId &&
-                room.status !== "finished" && (
+              {room.created_by === currentUserId && (
                   <button
                     onClick={() =>
                       transition(
-                        room.status === "waiting" ? "active" : "finished",
+                        room.status === "open" ? "locked" : "open",
                       )
                     }
                     className="rounded-full border border-[var(--accent)] px-3 py-2 text-xs text-[var(--accent)]"
                   >
-                    {room.status === "waiting"
-                      ? "Start session"
-                      : "End session"}
+                    {room.status === "open" ? "Lock chat" : "Open chat"}
                   </button>
                 )}
               {member && room.created_by !== currentUserId && (
@@ -163,7 +160,7 @@ export function RoomClient({
                   onClick={join}
                   className="rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-[#050505]"
                 >
-                  Join room
+                  Join chat
                 </button>
               )}
             </div>
@@ -172,7 +169,7 @@ export function RoomClient({
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {!member ? (
             <div className="grid h-full place-items-center text-center text-[var(--muted)]">
-              <p>Join this room to see and send messages.</p>
+              <p>Join this chat to see and send messages.</p>
             </div>
           ) : messages.length ? (
             messages.map((message) => (

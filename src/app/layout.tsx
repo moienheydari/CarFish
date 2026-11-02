@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { connection } from "next/server";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AppNav } from "@/components/app-nav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,9 +18,6 @@ export const metadata: Metadata = {
   title: "RatFish",
   description: "A chatroom game platform.",
 };
-
-// The navigation reads the Supabase session from request cookies.
-export const instant = false;
 
 export default async function RootLayout({
   children,

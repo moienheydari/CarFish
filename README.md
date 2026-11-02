@@ -5,7 +5,7 @@ For Development : https://supabase.com/dashboard/project/xnzwlzgpkrvfvmkqpqhk/au
 
 # ChatArena
 
-ChatArena is a Next.js App Router MVP for small, real-time chatroom competitions. It uses Supabase Auth, PostgreSQL, RLS, and Realtime; competition rules are intentionally limited to a host-controlled waiting/active/finished lifecycle.
+ChatArena is a Next.js App Router MVP for real-time game chats. It uses Supabase Auth, PostgreSQL, RLS, and Realtime. Chats are public or private, belong to a five-character game code, and can be open or locked.
 
 ## Local setup
 
@@ -25,7 +25,7 @@ npm run dev
 - Server Components load protected pages and use the cookie-backed Supabase SSR client.
 - `proxy.ts` refreshes auth cookies on requests. Route handlers under `src/app/api` authenticate and validate every mutation.
 - PostgreSQL constraints and RLS enforce ownership, membership, message length, and host-only state transitions.
-- `RoomClient` subscribes only to the active room's `messages` and `rooms` Postgres Changes channels. Message history starts at 50 rows and can be extended with cursor pagination.
+- `ChatClient` subscribes only to the active chat's `messages` and `chats` Postgres Changes channels. Message history starts at 50 rows and can be extended with cursor pagination.
 
 ## Deployment
 
@@ -37,4 +37,4 @@ Run `npm run lint`, `npx tsc --noEmit`, and `npm run build`. Cloud authenticatio
 
 ## Known limitations
 
-The MVP has no scoring, voting, rounds, uploads, private rooms, or exact online presence. The current schema is designed so those competition concepts can be added without changing chat membership semantics.
+The MVP has no scoring, voting, rounds, uploads, or exact online presence. Private chats are limited to two members by a database trigger.

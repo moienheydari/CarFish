@@ -14,15 +14,15 @@ export async function POST(
       { status: 401 },
     );
   const { status } = await request.json();
-  if (status !== "active" && status !== "finished")
+  if (status !== "open" && status !== "locked")
     return NextResponse.json(
-      { error: "Invalid state transition." },
+      { error: "Invalid chat status." },
       { status: 400 },
     );
   const { id } = await params;
-  const expected = status === "active" ? "waiting" : "active";
+  const expected = status === "open" ? "locked" : "open";
   const { data, error } = await supabase
-    .from("rooms")
+    .from("chats")
     .update({ status })
     .eq("id", id)
     .eq("created_by", user.id)
