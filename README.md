@@ -1,3 +1,8 @@
+Website : https://car-fish.vercel.app/
+
+For Development : https://supabase.com/dashboard/project/xnzwlzgpkrvfvmkqpqhk/auth/url-configuration
+
+
 # ChatArena
 
 ChatArena is a Next.js App Router MVP for small, real-time chatroom competitions. It uses Supabase Auth, PostgreSQL, RLS, and Realtime; competition rules are intentionally limited to a host-controlled waiting/active/finished lifecycle.
