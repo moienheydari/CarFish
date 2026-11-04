@@ -1,6 +1,12 @@
 import { z } from "zod";
 
+
+export const createGameSchema = z.object({
+  game_code: z.string().trim().length(4, "Game code must be exactly 4 characters.").regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
+  has_decoy: z.boolean(),
+});
 export const profileSchema = z.object({
+  real_name: z.string().trim().max(100, "Real name is too long.").optional().default(""),
   display_name: z
     .string()
     .trim()
@@ -12,12 +18,16 @@ export const profileSchema = z.object({
     .max(280, "Bio must be 280 characters or fewer.")
     .optional()
     .default(""),
+  job: z.string().trim().max(100, "Job is too long.").optional().default(""),
+  age: z.coerce.number().int("Age must be a whole number.").nullable(),
   profile_image_url: z
     .string()
     .trim()
     .max(2048, "Profile image URL is too long.")
     .optional()
     .default(""),
+});
+export const gameCodeSchema = z.object({
   game_code: z
     .string()
     .trim()
