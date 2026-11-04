@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RatFish",
+  title: "CarFish",
   description: "A chatroom game platform.",
 };
 
