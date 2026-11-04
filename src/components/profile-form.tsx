@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Profile } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
+import { GameCreateModal } from "@/components/game-create-modal";
 
 const MAX_PROFILE_IMAGE_SIZE = 15 * 1024 * 1024;
 const PROFILE_IMAGE_TYPES = new Set([
@@ -14,15 +15,21 @@ const PROFILE_IMAGE_TYPES = new Set([
 
 export function ProfileForm({ profile }: { profile: Profile | null }) {
   const [values, setValues] = useState({
+    real_name: profile?.real_name ?? "",
     display_name: profile?.display_name ?? "",
     profile_image_url: profile?.profile_image_url ?? "",
-    game_code: profile?.game_code ?? "FREE",
+    job: profile?.job ?? "",
+    age: profile?.age?.toString() ?? "",
     bio: profile?.bio ?? "",
   });
+  const [gameCode, setGameCode] = useState(profile?.game_code ?? "");
+  const [canClaimGameMaster, setCanClaimGameMaster] = useState(false);
+  const [canClaimDecoy, setCanClaimDecoy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [createGameOpen, setCreateGameOpen] = useState(false);
   const router = useRouter();
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -56,7 +63,11 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       const response = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...values, profile_image_url: profileImageUrl }),
+        body: JSON.stringify({
+          ...values,
+          age: values.age === "" ? null : Number(values.age),
+          profile_image_url: profileImageUrl,
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not save profile.");
@@ -69,6 +80,54 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         caughtError instanceof Error
           ? caughtError.message
           : "Could not save profile.",
+      );
+    } finally {
+      setBusy(false);
+    }
+
+  }
+
+  async function joinGame() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "join", game_code: gameCode }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not join game.");
+      setGameCode(result.game_code);
+      setCanClaimGameMaster(result.can_claim_game_master);
+      setCanClaimDecoy(result.can_claim_decoy);
+      setMessage(`Joined game ${result.game_code}.`);
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "Could not join game.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function claimRole(action: "claim_game_master" | "claim_decoy") {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not claim role.");
+      if (action === "claim_game_master") setCanClaimGameMaster(false);
+      else setCanClaimDecoy(false);
+      setMessage("Role claimed successfully.");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "Could not claim role.",
       );
     } finally {
       setBusy(false);
@@ -95,6 +154,16 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   return (
     <form onSubmit={submit} className="space-y-5">
       <label className="block text-sm font-medium">
+        Real name
+        <input
+          value={values.real_name}
+          onChange={(e) => setValues({ ...values, real_name: e.target.value })}
+          maxLength={100}
+          required
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+        />
+      </label>
+      <label className="block text-sm font-medium">
         Display name
         <input
           value={values.display_name}
@@ -106,6 +175,64 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
       </label>
+      <label className="block text-sm font-medium">
+        Job
+        <input
+          value={values.job}
+          onChange={(e) => setValues({ ...values, job: e.target.value })}
+          maxLength={100}
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+        />
+      </label>
+      <label className="block text-sm font-medium">
+        Age
+        <input
+          type="number"
+          value={values.age}
+          onChange={(e) => setValues({ ...values, age: e.target.value })}
+          className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 outline-none focus:border-[var(--accent)]"
+        />
+      </label>
+      <div className="flex items-end gap-3">
+        <label className="block flex-1 text-sm font-medium">
+          Game code
+          <input
+            value={gameCode}
+            onChange={(e) => setGameCode(e.target.value.toUpperCase().slice(0, 4))}
+            maxLength={4}
+            required
+            className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 uppercase outline-none focus:border-[var(--accent)]"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={joinGame}
+          disabled={busy || gameCode.length !== 4}
+          className="rounded-xl border border-[var(--accent)] px-5 py-3 font-semibold text-[var(--accent)] disabled:opacity-50"
+        >
+          Join
+        </button>
+        <button
+          type="button"
+          onClick={() => setCreateGameOpen(true)}
+          disabled={busy || gameCode.length !== 4}
+          className="rounded-xl border border-[var(--line)] px-5 py-3 font-semibold disabled:opacity-50"
+        >
+          Create
+        </button>
+      </div>
+      {canClaimGameMaster && (
+        <label className="flex items-center gap-3 text-sm">
+          <input type="checkbox" onChange={() => claimRole("claim_game_master")} disabled={busy} />
+          Are you the game master?
+        </label>
+      )}
+      {canClaimDecoy && (
+        <label className="flex items-center gap-3 text-sm">
+          <input type="checkbox" onChange={() => claimRole("claim_decoy")} disabled={busy} />
+          Are you the decoy?
+        </label>
+      )}
       <label className="block text-sm font-medium">
         Upload a profile image
         <input
@@ -147,6 +274,14 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           {busy ? "Saving..." : "Save profile"}
         </button>
       </div>
+      <GameCreateModal
+        open={createGameOpen}
+        busy={busy}
+        gameCode={gameCode}
+        onClose={() => setCreateGameOpen(false)}
+        onBusyChange={setBusy}
+        onCreated={setGameCode}
+      />
     </form>
   );
 }
