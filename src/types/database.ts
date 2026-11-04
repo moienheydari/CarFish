@@ -1,12 +1,24 @@
 export type ChatType = "public" | "private";
 export type ChatStatus = "open" | "locked";
+export type GamePhase = "not_started" | "chat_phase" | "vote_phase";
+
+export type Game = {
+  game_code: string;
+  phase: GamePhase;
+  has_decoy: boolean;
+};
 
 export type Profile = {
   id: string;
+  real_name: string | null;
   display_name: string | null;
   profile_image_url: string | null;
+  job: string | null;
+  age: number | null;
   bio: string | null;
   is_gm: boolean;
+  is_decoy: boolean;
+  score: number;
   game_code: string;
   created_at: string;
   updated_at: string;
