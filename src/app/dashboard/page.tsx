@@ -13,7 +13,8 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const profile = await getCurrentProfile(user.id);
   const supabase = await createClient();
-  if (!profile)
+  if (!profile || (!profile.is_gm &&
+    [profile.game_code, profile.real_name, profile.display_name].some((value) => !value?.trim(),)))
     return (
       <main className="mx-auto flex-1 px-5 py-12">
         <p className="text-rose-300">Complete your profile to enter the game.</p>
