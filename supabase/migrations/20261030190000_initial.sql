@@ -7,20 +7,34 @@ drop table if exists public.chat_members cascade;
 drop table if exists public.rooms cascade;
 drop table if exists public.chats cascade;
 drop table if exists public.profiles cascade;
+drop table if exists public.games cascade;
 drop type if exists public.room_status cascade;
 drop type if exists public.chat_type cascade;
 drop type if exists public.chat_status cascade;
+drop type if exists public.game_phase cascade;
 
 create type public.chat_type as enum ('public', 'private');
 create type public.chat_status as enum ('open', 'locked');
+create type public.game_phase as enum ('not_started', 'chat_phase', 'vote_phase');
+
+create table public.games (
+  game_code varchar(4) primary key check (game_code ~ '^[A-Za-z0-9]{4}$'),
+  phase public.game_phase not null default 'not_started',
+  has_decoy boolean not null default false
+);
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  real_name text,
   display_name text,
   profile_image_url text,
+  job text,
+  age integer,
   bio text,
   is_gm boolean not null default false,
-  game_code varchar(4) not null check (game_code ~ '^[A-Za-z0-9]{4}$') default 'FREE',
+  is_decoy boolean not null default false,
+  score integer not null default 0,
+  game_code varchar(4) references public.games(game_code),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint display_name_length check (display_name is null or char_length(display_name) between 1 and 50),
@@ -30,7 +44,7 @@ create table public.profiles (
 
 create table public.chats (
   id uuid primary key default gen_random_uuid(),
-  game_code varchar(4) not null check (game_code ~ '^[A-Za-z0-9]{4}$'),
+  game_code varchar(4) not null references public.games(game_code),
   name text not null check (char_length(name) between 3 and 60),
   description text check (description is null or char_length(description) <= 280),
   created_by uuid not null references public.profiles(id) on delete restrict,
@@ -60,86 +74,28 @@ create index chats_created_at_idx on public.chats(created_at desc);
 create index chat_members_user_id_idx on public.chat_members(user_id);
 create index messages_chat_created_at_idx on public.messages(chat_id, created_at desc);
 
-create or replace function public.touch_updated_at() returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+insert into storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+values (
+  'avatars',
+  'avatars',
+  true,
+  15728640,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']::text[]
+)
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
-create or replace function public.protect_profile_role_fields() returns trigger
-language plpgsql
-as $$
-begin
-  if new.is_gm is distinct from old.is_gm
-     and current_user not in ('postgres', 'service_role') then
-    raise exception 'Only a trusted server can change is_gm';
-  end if;
-  return new;
-end;
-$$;
-
-create or replace function public.enforce_private_chat_members_limit() returns trigger
-language plpgsql
-as $$
-begin
-  if (select chat_type from public.chats where id = new.chat_id) = 'private'
-     and (select count(*) from public.chat_members where chat_id = new.chat_id) >= 2 then
-    raise exception 'Private chats can only have two members';
-  end if;
-  return new;
-end;
-$$;
-
-create trigger profiles_updated_at before update on public.profiles
-for each row execute function public.touch_updated_at();
-create trigger profiles_role_fields before update on public.profiles
-for each row execute function public.protect_profile_role_fields();
-create trigger chats_updated_at before update on public.chats
-for each row execute function public.touch_updated_at();
-create trigger private_chat_members_limit before insert on public.chat_members
-for each row execute function public.enforce_private_chat_members_limit();
 
 alter table public.profiles enable row level security;
+alter table public.games enable row level security;
 alter table public.chats enable row level security;
 alter table public.chat_members enable row level security;
 alter table public.messages enable row level security;
-
-create policy "profiles are public to authenticated users" on public.profiles
-for select to authenticated using (true);
-create policy "users create own profile" on public.profiles
-for insert to authenticated with check (id = auth.uid());
-create policy "users update own profile" on public.profiles
-for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
-create policy "authenticated users read chats" on public.chats
-for select to authenticated using (true);
-create policy "users create own chats" on public.chats
-for insert to authenticated with check (created_by = auth.uid());
-create policy "hosts update chat state" on public.chats
-for update to authenticated using (created_by = auth.uid()) with check (created_by = auth.uid());
-create policy "members read membership" on public.chat_members
-for select to authenticated using (true);
-create policy "users join open chats" on public.chat_members
-for insert to authenticated with check (
-  user_id = auth.uid()
-  and exists (select 1 from public.chats where chats.id = chat_id and chats.status = 'open')
-);
-create policy "users leave chats" on public.chat_members
-for delete to authenticated using (
-  user_id = auth.uid()
-  and not exists (select 1 from public.chats where chats.id = chat_id and chats.created_by = auth.uid())
-);
-create policy "members read messages" on public.messages
-for select to authenticated using (
-  exists (select 1 from public.chat_members m where m.chat_id = messages.chat_id and m.user_id = auth.uid())
-);
-create policy "members send messages" on public.messages
-for insert to authenticated with check (
-  sender_id = auth.uid()
-  and exists (select 1 from public.chat_members m where m.chat_id = messages.chat_id and m.user_id = auth.uid())
-);
-
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.chats;
