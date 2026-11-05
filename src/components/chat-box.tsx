@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Chat, Message } from "@/types/database";
 
-export function DashboardChat({
+export function ChatBox({
   chat,
   currentUserId,
   canSend,

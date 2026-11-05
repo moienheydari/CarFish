@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MessageCircle, UserRound } from "lucide-react";
 import Image from "next/image";
-import { DashboardChat } from "@/components/dashboard-chat";
+import { ChatBox } from "@/components/chat-box";
 import type { Chat, Profile } from "@/types/database";
 
 export function PlayerPanel({
@@ -99,7 +99,7 @@ export function PlayerPanel({
               {error}
             </p>
           )}
-          <DashboardChat
+          <ChatBox
             key={selectedChat?.id ?? "empty"}
             chat={selectedChat}
             currentUserId={currentUserId}

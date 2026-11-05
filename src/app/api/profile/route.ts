@@ -55,6 +55,7 @@ export async function PATCH(request: Request) {
       .from("games")
       .select("game_code,has_decoy")
       .eq("game_code", gameCode)
+      .eq("phase", "not_started")
       .maybeSingle();
     if (gameError)
       return NextResponse.json({ error: "Could not check game." }, { status: 500 });
@@ -67,6 +68,83 @@ export async function PATCH(request: Request) {
       .eq("id", user.id);
     if (updateError)
       return NextResponse.json({ error: "Could not join game." }, { status: 500 });
+
+    const { data: gameMaster, error: gameMasterError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("game_code", game.game_code)
+      .eq("is_gm", true)
+      .maybeSingle();
+    if (gameMasterError)
+      return NextResponse.json({ error: "Could not find the game master." }, { status: 500 });
+
+    if (gameMaster && gameMaster.id !== user.id) {
+      const { data: gmChats, error: gmChatsError } = await supabase
+        .from("chats")
+        .select("id")
+        .eq("game_code", game.game_code)
+        .eq("chat_type", "with_gm");
+      if (gmChatsError)
+        return NextResponse.json({ error: "Could not check the game master chat." }, { status: 500 });
+
+      const gmChatIds = (gmChats ?? []).map((chat) => chat.id);
+      let memberships: { chat_id: string; user_id: string }[] = [];
+      if (gmChatIds.length) {
+        const { data, error: membershipsError } = await supabase
+          .from("chat_members")
+          .select("chat_id,user_id")
+          .in("chat_id", gmChatIds)
+          .in("user_id", [user.id, gameMaster.id]);
+        if (membershipsError)
+          return NextResponse.json({ error: "Could not check the game master chat members." }, { status: 500 });
+        memberships = data ?? [];
+      }
+
+      const playerChat = (gmChats ?? []).find((chat) =>
+        (memberships ?? []).some(
+          (membership) =>
+            membership.chat_id === chat.id && membership.user_id === user.id,
+        ),
+      );
+
+      if (playerChat) {
+        const gmIsMember = (memberships ?? []).some(
+          (membership) =>
+            membership.chat_id === playerChat.id &&
+            membership.user_id === gameMaster.id,
+        );
+        if (!gmIsMember) {
+          const { error: gmMembershipError } = await supabase
+            .from("chat_members")
+            .insert({ chat_id: playerChat.id, user_id: gameMaster.id });
+          if (gmMembershipError)
+            return NextResponse.json({ error: "Could not add the game master to the chat." }, { status: 500 });
+        }
+      } else {
+        const { data: gmChat, error: gmChatError } = await supabase
+          .from("chats")
+          .insert({
+            game_code: game.game_code,
+            name: "Chat with the game master",
+            description: "A private conversation with the game master.",
+            chat_type: "with_gm",
+            created_by: user.id,
+          })
+          .select()
+          .single();
+        if (gmChatError || !gmChat)
+          return NextResponse.json({ error: "Could not create the game master chat." }, { status: 500 });
+
+        const { error: gmMembershipError } = await supabase
+          .from("chat_members")
+          .insert([
+            { chat_id: gmChat.id, user_id: user.id },
+            { chat_id: gmChat.id, user_id: gameMaster.id },
+          ]);
+        if (gmMembershipError)
+          return NextResponse.json({ error: "Could not add members to the game master chat." }, { status: 500 });
+      }
+    }
 
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")

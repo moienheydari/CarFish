@@ -3,6 +3,7 @@ import { requireUser, getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { GmPanel } from "@/components/gm-panel";
+import { GmChatModal } from "@/components/gm-chat-modal";
 import { PlayerPanel } from "@/components/player-panel";
 import type { Chat, Profile } from "@/types/database";
 
@@ -60,8 +61,14 @@ export default async function DashboardPage() {
   const chats = (chatRows ?? []).filter(
     (chat) =>
       profile.is_gm ||
-      (chat.chat_type === "public" || userChatsIds.has(chat.id)),
+      (chat.chat_type !== "with_gm" &&
+        (chat.chat_type === "public" || userChatsIds.has(chat.id))),
   ) as Chat[];
+  const gmChat = profile.is_gm
+    ? null
+    : ((chatRows ?? []).find(
+        (chat) => chat.chat_type === "with_gm" && userChatsIds.has(chat.id),
+      ) as Chat | undefined) ?? null;
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12">
       <div className="flex flex-wrap items-end justify-between gap-5">
@@ -80,13 +87,18 @@ export default async function DashboardPage() {
           currentUserId={user.id}
         />
       ) : (
-        <PlayerPanel
-          players={(players ?? []) as Profile[]}
-          initialChats={chats}
-          initialChatMembers={userChats ?? []}
-          currentUserId={user.id}
-          gameCode={profile.game_code}
-        />
+        <>
+          <PlayerPanel
+            players={(players ?? []) as Profile[]}
+            initialChats={chats}
+            initialChatMembers={userChats ?? []}
+            currentUserId={user.id}
+            gameCode={profile.game_code}
+          />
+          {gmChat && (
+            <GmChatModal chat={gmChat} currentUserId={user.id} />
+          )}
+        </>
       )}
     </main>
   );

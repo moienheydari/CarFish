@@ -13,7 +13,7 @@ drop type if exists public.chat_type cascade;
 drop type if exists public.chat_status cascade;
 drop type if exists public.game_phase cascade;
 
-create type public.chat_type as enum ('public', 'private');
+create type public.chat_type as enum ('public', 'private', 'with_gm');
 create type public.chat_status as enum ('open', 'locked');
 create type public.game_phase as enum ('not_started', 'chat_phase', 'vote_phase');
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { MessageCircle, Users } from "lucide-react";
 import Image from "next/image";
-import { DashboardChat } from "@/components/dashboard-chat";
+import { ChatBox } from "@/components/chat-box";
 import type { Chat, Profile } from "@/types/database";
 
 export function GmPanel({
@@ -19,6 +19,8 @@ export function GmPanel({
     chats.find((chat) => chat.chat_type === "public")?.id ?? chats[0]?.id ?? "",
   );
   const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
+  const gameChats = chats.filter((chat) => chat.chat_type !== "with_gm");
+  const gmChats = chats.filter((chat) => chat.chat_type === "with_gm");
 
   return (
     <section className="mt-10">
@@ -45,19 +47,19 @@ export function GmPanel({
             )}
           </div>
         </aside>
-        <DashboardChat
+        <ChatBox
           key={selectedChat?.id ?? "empty"}
           chat={selectedChat}
           currentUserId={currentUserId}
-          canSend={false}
+          canSend
           canManage
         />
         <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <MessageCircle size={16} /> All chats
+            <MessageCircle size={16} /> Game chats
           </div>
           <div className="space-y-2">
-            {chats.map((chat) => (
+            {gameChats.map((chat) => (
               <button
                 key={chat.id}
                 type="button"
@@ -70,9 +72,34 @@ export function GmPanel({
                 </span>
               </button>
             ))}
-            {!chats.length && (
+            {!gameChats.length && (
               <p className="text-sm text-[var(--muted)]">No chats yet.</p>
             )}
+          </div>
+          <div className="mt-6 border-t border-[var(--line)] pt-4">
+            <div className="mb-3 text-sm font-semibold text-[var(--accent)]">
+              Game master conversations
+            </div>
+            <div className="space-y-2">
+              {gmChats.map((chat) => (
+                <button
+                  key={chat.id}
+                  type="button"
+                  onClick={() => setSelectedChatId(chat.id)}
+                  className={`w-full rounded-xl border px-3 py-3 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                >
+                  <span className="block font-medium">{chat.name}</span>
+                  <span className="text-xs text-[var(--muted)]">
+                    Player conversation · {chat.status}
+                  </span>
+                </button>
+              ))}
+              {!gmChats.length && (
+                <p className="text-sm text-[var(--muted)]">
+                  No player GM chats yet.
+                </p>
+              )}
+            </div>
           </div>
         </aside>
       </div>

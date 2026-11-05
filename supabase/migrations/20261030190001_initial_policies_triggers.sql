@@ -96,6 +96,7 @@ drop policy if exists "Private chat creators add their recipient" on public.chat
 drop policy if exists "Game masters read game messages" on public.messages;
 drop policy if exists "Players read open public game messages" on public.messages;
 drop policy if exists "Players send open public game messages" on public.messages;
+drop policy if exists "Game masters send game messages" on public.messages;
 drop policy if exists "Game masters update game chat state" on public.chats;
 
 create policy "authenticated users read games" on public.games
@@ -200,6 +201,8 @@ using (
   and (storage.foldername(name))[1] = (select auth.uid()::text)
 );
 
+drop policy if exists "Private chat creators add their recipient" on public.chat_members;
+
 create policy "Private chat creators add their recipient"
 on public.chat_members
 for insert
@@ -212,13 +215,17 @@ with check (
     join public.profiles creator on creator.id = c.created_by
     join public.profiles recipient on recipient.id = chat_members.user_id
     where c.id = chat_id
-      and c.chat_type = 'private'
+      and c.chat_type in ('private', 'with_gm')
       and c.created_by = (select auth.uid())
       and c.status = 'open'
       and creator.game_code = recipient.game_code
-      and recipient.is_gm = false
+      and (
+        (c.chat_type = 'private' and recipient.is_gm = false)
+        or (c.chat_type = 'with_gm' and recipient.is_gm = true)
+      )
   )
 );
+
 
 create policy "Game masters read game messages"
 on public.messages
@@ -267,6 +274,23 @@ with check (
       and c.status = 'open'
       and player.game_code = c.game_code
       and player.is_gm = false
+  )
+);
+
+create policy "Game masters send game messages"
+on public.messages
+for insert
+to authenticated
+with check (
+  sender_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.chats c
+    join public.profiles gm on gm.id = (select auth.uid())
+    where c.id = messages.chat_id
+      and c.status = 'open'
+      and gm.is_gm = true
+      and gm.game_code = c.game_code
   )
 );
 
