@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { markChatRead } from "@/hooks/use-unread-chat-counts";
 import type { Chat, Message } from "@/types/database";
 
 export function ChatBox({
@@ -25,6 +26,7 @@ export function ChatBox({
   useEffect(() => {
     if (!chat) return;
 
+    markChatRead(currentUserId, chat.id);
     let active = true;
     const supabase = createClient();
     void fetch(`/api/chats/${chat.id}/messages`)
@@ -86,7 +88,7 @@ export function ChatBox({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [chat]);
+  }, [chat, currentUserId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });

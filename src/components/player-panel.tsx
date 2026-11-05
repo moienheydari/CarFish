@@ -4,6 +4,10 @@ import { useState } from "react";
 import { MessageCircle, UserRound } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
+import {
+  useUnreadChatCounts,
+  markChatRead,
+} from "@/hooks/use-unread-chat-counts";
 import type { Chat, Profile } from "@/types/database";
 
 export function PlayerPanel({
@@ -29,6 +33,12 @@ export function PlayerPanel({
   const [error, setError] = useState("");
   const [busyPlayerId, setBusyPlayerId] = useState("");
   const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
+  const unreadCounts = useUnreadChatCounts(chats, currentUserId);
+
+  function selectChat(chatId: string) {
+    markChatRead(currentUserId, chatId);
+    setSelectedChatId(chatId);
+  }
 
   async function openPrivateChat(player: Profile) {
     if (player.id === currentUserId) return;
@@ -81,6 +91,21 @@ export function PlayerPanel({
     );
   }
 
+  function getPrivateChat(playerId: string) {
+    return chats.find(
+      (chat) =>
+        chat.chat_type === "private" &&
+        chatMembers.some(
+          (member) =>
+            member.chat_id === chat.id && member.user_id === playerId,
+        ) &&
+        chatMembers.some(
+          (member) =>
+            member.chat_id === chat.id && member.user_id === currentUserId,
+        ),
+    );
+  }
+
   const publicChat = chats.find((chat) => chat.chat_type === "public");
 
   return (
@@ -114,8 +139,8 @@ export function PlayerPanel({
           <div className="space-y-2">
             {publicChat && (
               <div
-                onClick={() => setSelectedChatId(publicChat.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border p-2 text-left ${selectedChatId === publicChat.id ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                onClick={() => selectChat(publicChat.id)}
+                className={`relative flex w-full items-center gap-3 rounded-xl border p-2 pr-8 text-left ${selectedChatId === publicChat.id ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-[#050505]">
                   <MessageCircle size={18} />
@@ -127,24 +152,32 @@ export function PlayerPanel({
                   <span className="block text-xs text-[var(--muted)]">
                     {publicChat.status === "open" ? "Open" : "Closed"}
                   </span>
+                  {unreadCounts[publicChat.id] > 0 && (
+                    <UnreadBadge count={unreadCounts[publicChat.id]} />
+                  )}
                 </span>
               </div>
             )}
             {players
               .filter((player) => player.id !== currentUserId)
-              .map((player) => (
+              .map((player) => {
+                const privateChat = getPrivateChat(player.id);
+                return (
                 <div
                   key={player.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => openPrivateChat(player)}
+                  onClick={() => {
+                    if (privateChat) selectChat(privateChat.id);
+                    else void openPrivateChat(player);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       openPrivateChat(player);
                     }
                   }}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${
+                  className={`relative flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${
                     busyPlayerId === player.id ? "pointer-events-none opacity-50" : ""
                   } ${
                     isPrivateChatSelected(player.id)
@@ -163,8 +196,12 @@ export function PlayerPanel({
                         ? "Open chat"
                         : "Create chat"}
                   </span>
+                  {privateChat && unreadCounts[privateChat.id] > 0 && (
+                    <UnreadBadge count={unreadCounts[privateChat.id]} />
+                  )}
                 </div>
-              ))}
+                );
+              })}
             {!players.length && (
               <p className="text-sm text-[var(--muted)]">No players yet.</p>
             )}
@@ -172,6 +209,14 @@ export function PlayerPanel({
         </aside>
       </div>
     </section>
+  );
+}
+
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span className="absolute right-2 top-2 grid min-w-5 place-items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-xs font-bold text-[#050505]">
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 

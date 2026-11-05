@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { ChatBox } from "@/components/chat-box";
+import { useUnreadChatCounts } from "@/hooks/use-unread-chat-counts";
 import type { Chat } from "@/types/database";
 
 export function GmChatModal({
@@ -13,6 +14,14 @@ export function GmChatModal({
   currentUserId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const chats = useMemo(() => [chat], [chat]);
+  const unreadCounts = useUnreadChatCounts(chats, currentUserId);
+
+  useEffect(() => {
+    if (unreadCounts[chat.id] <= 0) return;
+    const timer = window.setTimeout(() => setOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [chat.id, unreadCounts]);
 
   return (
     <>
@@ -26,12 +35,12 @@ export function GmChatModal({
       </button>
       {open && (
         <div
-          className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-5"
+          className="fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-black/70 p-5"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setOpen(false);
           }}
         >
-          <div className="w-full max-w-2xl">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto">
             <div className="mb-3 flex justify-end">
               <button
                 type="button"

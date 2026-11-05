@@ -57,7 +57,11 @@ export default async function DashboardPage() {
   const { data: userChats } = await supabase
     .from("chat_members")
     .select("chat_id,user_id");
-  const userChatsIds = new Set((userChats ?? []).map((item) => item.chat_id));
+  const userChatsIds = new Set(
+    (userChats ?? [])
+      .filter((item) => item.user_id === user.id)
+      .map((item) => item.chat_id),
+  );
   const chats = (chatRows ?? []).filter(
     (chat) =>
       profile.is_gm ||

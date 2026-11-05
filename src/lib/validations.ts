@@ -34,6 +34,9 @@ export const gameCodeSchema = z.object({
     .length(4, "Game code must be exactly 4 characters.")
     .regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
 });
+export const joinGameSchema = gameCodeSchema.extend({
+  display_name: z.string().trim().min(1).max(50).optional(),
+});
 export const chatSchema = z.object({
   game_code: z
     .string()

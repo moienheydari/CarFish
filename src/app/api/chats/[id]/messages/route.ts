@@ -60,10 +60,17 @@ export async function POST(
     })
     .select("*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)")
     .single();
-  if (error)
+  if (error) {
+    console.error("Could not send chat message.", {
+      chatId: id,
+      userId: user.id,
+      code: error.code,
+      message: error.message,
+    });
     return NextResponse.json(
       { error: "You must join this chat before sending messages." },
       { status: 403 },
     );
+  }
   return NextResponse.json(data, { status: 201 });
 }

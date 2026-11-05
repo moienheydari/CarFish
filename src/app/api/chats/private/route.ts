@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const { data: participants } = await supabase
     .from("profiles")
-    .select("id,game_code,is_gm")
+    .select("id,game_code,is_gm,display_name")
     .in("id", [user.id, parsed.data.recipient_id]);
   const currentProfile = participants?.find((profile) => profile.id === user.id);
   const recipientProfile = participants?.find(
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     .from("chats")
     .insert({
       game_code: gameCode,
-      name: `Private chat with ${parsed.data.recipient_id.slice(0, 8)}`,
+      name: `Chat for ${currentProfile.display_name || "Unnamed player"} & ${recipientProfile.display_name || "Unnamed player"}`,
       description: "A private player conversation.",
       chat_type: "private",
       created_by: user.id,

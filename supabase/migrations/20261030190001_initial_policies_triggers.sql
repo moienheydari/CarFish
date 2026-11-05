@@ -97,6 +97,7 @@ drop policy if exists "Game masters read game messages" on public.messages;
 drop policy if exists "Players read open public game messages" on public.messages;
 drop policy if exists "Players send open public game messages" on public.messages;
 drop policy if exists "Game masters send game messages" on public.messages;
+drop policy if exists "Players send with gm messages" on public.messages;
 drop policy if exists "Game masters update game chat state" on public.chats;
 
 create policy "authenticated users read games" on public.games
@@ -291,6 +292,26 @@ with check (
       and c.status = 'open'
       and gm.is_gm = true
       and gm.game_code = c.game_code
+  )
+);
+
+create policy "Players send with gm messages"
+on public.messages
+for insert
+to authenticated
+with check (
+  sender_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.chat_members m
+    join public.chats c on c.id = m.chat_id
+    join public.profiles player on player.id = (select auth.uid())
+    where m.chat_id = messages.chat_id
+      and m.user_id = (select auth.uid())
+      and c.chat_type = 'with_gm'
+      and c.status = 'open'
+      and player.is_gm = false
+      and player.game_code = c.game_code
   )
 );
 

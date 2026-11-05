@@ -4,6 +4,10 @@ import { useState } from "react";
 import { MessageCircle, Users } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
+import {
+  markChatRead,
+  useUnreadChatCounts,
+} from "@/hooks/use-unread-chat-counts";
 import type { Chat, Profile } from "@/types/database";
 
 export function GmPanel({
@@ -21,6 +25,12 @@ export function GmPanel({
   const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
   const gameChats = chats.filter((chat) => chat.chat_type !== "with_gm");
   const gmChats = chats.filter((chat) => chat.chat_type === "with_gm");
+  const unreadCounts = useUnreadChatCounts(chats, currentUserId);
+
+  function selectChat(chatId: string) {
+    markChatRead(currentUserId, chatId);
+    setSelectedChatId(chatId);
+  }
 
   return (
     <section className="mt-10">
@@ -63,13 +73,16 @@ export function GmPanel({
               <button
                 key={chat.id}
                 type="button"
-                onClick={() => setSelectedChatId(chat.id)}
-                className={`w-full rounded-xl border px-3 py-3 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                onClick={() => selectChat(chat.id)}
+                className={`relative w-full rounded-xl border px-3 py-3 pr-10 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
               >
                 <span className="block font-medium">{chat.name}</span>
                 <span className="text-xs text-[var(--muted)]">
                   {chat.chat_type} · {chat.status}
                 </span>
+                {unreadCounts[chat.id] > 0 && (
+                  <UnreadBadge count={unreadCounts[chat.id]} />
+                )}
               </button>
             ))}
             {!gameChats.length && (
@@ -85,13 +98,16 @@ export function GmPanel({
                 <button
                   key={chat.id}
                   type="button"
-                  onClick={() => setSelectedChatId(chat.id)}
-                  className={`w-full rounded-xl border px-3 py-3 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                  onClick={() => selectChat(chat.id)}
+                  className={`relative w-full rounded-xl border px-3 py-3 pr-10 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
                 >
                   <span className="block font-medium">{chat.name}</span>
                   <span className="text-xs text-[var(--muted)]">
                     Player conversation · {chat.status}
                   </span>
+                  {unreadCounts[chat.id] > 0 && (
+                    <UnreadBadge count={unreadCounts[chat.id]} />
+                  )}
                 </button>
               ))}
               {!gmChats.length && (
@@ -104,6 +120,14 @@ export function GmPanel({
         </aside>
       </div>
     </section>
+  );
+}
+
+function UnreadBadge({ count }: { count: number }) {
+  return (
+    <span className="absolute right-2 top-2 grid min-w-5 place-items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-xs font-bold text-[#050505]">
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 

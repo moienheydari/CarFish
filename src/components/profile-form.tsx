@@ -94,7 +94,11 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "join", game_code: gameCode }),
+        body: JSON.stringify({
+          action: "join",
+          game_code: gameCode,
+          display_name: values.display_name,
+        }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not join game.");

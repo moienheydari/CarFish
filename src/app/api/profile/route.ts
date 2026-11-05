@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { gameCodeSchema, profileSchema } from "@/lib/validations";
+import { joinGameSchema, profileSchema } from "@/lib/validations";
 
 export async function PUT(request: Request) {
   const supabase = await createClient();
@@ -44,7 +44,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   if (body.action === "join") {
-    const parsed = gameCodeSchema.safeParse(body);
+    const parsed = joinGameSchema.safeParse(body);
     if (!parsed.success)
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Invalid game code." },
@@ -64,10 +64,23 @@ export async function PATCH(request: Request) {
 
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ game_code: game.game_code })
+      .update({
+        game_code: game.game_code,
+        ...(parsed.data.display_name
+          ? { display_name: parsed.data.display_name }
+          : {}),
+      })
       .eq("id", user.id);
     if (updateError)
       return NextResponse.json({ error: "Could not join game." }, { status: 500 });
+
+    const { data: currentProfile, error: currentProfileError } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .single();
+    if (currentProfileError)
+      return NextResponse.json({ error: "Could not load your profile." }, { status: 500 });
 
     const { data: gameMaster, error: gameMasterError } = await supabase
       .from("profiles")
@@ -125,7 +138,7 @@ export async function PATCH(request: Request) {
           .from("chats")
           .insert({
             game_code: game.game_code,
-            name: "Chat with the game master",
+            name: `${currentProfile.display_name || "Unnamed player"} Chat with GM`,
             description: "A private conversation with the game master.",
             chat_type: "with_gm",
             created_by: user.id,
