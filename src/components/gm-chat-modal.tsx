@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 import { ChatBox } from "@/components/chat-box";
 import { useUnreadChatCounts } from "@/hooks/use-unread-chat-counts";
@@ -15,13 +15,7 @@ export function GmChatModal({
 }) {
   const [open, setOpen] = useState(false);
   const chats = useMemo(() => [chat], [chat]);
-  const unreadCounts = useUnreadChatCounts(chats, currentUserId);
-
-  useEffect(() => {
-    if (unreadCounts[chat.id] <= 0) return;
-    const timer = window.setTimeout(() => setOpen(true), 0);
-    return () => window.clearTimeout(timer);
-  }, [chat.id, unreadCounts]);
+  useUnreadChatCounts(chats, currentUserId, () => setOpen(true));
 
   return (
     <>

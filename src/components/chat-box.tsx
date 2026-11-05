@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
-import { markChatRead } from "@/hooks/use-unread-chat-counts";
+import {
+  markChatRead,
+  MESSAGE_EVENT,
+} from "@/hooks/use-unread-chat-counts";
 import type { Chat, Message } from "@/types/database";
 
 export function ChatBox({
@@ -26,15 +29,58 @@ export function ChatBox({
   useEffect(() => {
     if (!chat) return;
 
-    markChatRead(currentUserId, chat.id);
+    const activeChat = chat;
+    markChatRead(currentUserId, activeChat.id);
     let active = true;
     const supabase = createClient();
-    void fetch(`/api/chats/${chat.id}/messages`)
-      .then(async (response) => {
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? "Unable to load messages.");
-        if (active) setMessages(result as Message[]);
-      })
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let connecting = false;
+
+    function mergeMessages(
+      existing: Message[],
+      incoming: Message[],
+    ): Message[] {
+      const byId = new Map(existing.map((message) => [message.id, message]));
+      incoming.forEach((message) => byId.set(message.id, message));
+      return [...byId.values()].sort(
+        (left, right) =>
+          new Date(left.created_at).getTime() -
+          new Date(right.created_at).getTime(),
+      );
+    }
+
+    async function loadHistory() {
+      const response = await fetch(`/api/chats/${activeChat.id}/messages`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to load messages.");
+      if (active) setMessages((old) => mergeMessages(old, result as Message[]));
+    }
+
+    async function loadMessage(messageId: string) {
+      const { data } = await supabase
+        .from("messages")
+        .select(
+          "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
+        )
+        .eq("id", messageId)
+        .single();
+      if (active && data) {
+        markChatRead(currentUserId, activeChat.id);
+        setMessages((old) => mergeMessages(old, [data as Message]));
+      }
+    }
+
+    function handleMessage(event: Event) {
+      const detail = (event as CustomEvent<{
+        chatId: string;
+        messageId: string;
+      }>).detail;
+      if (detail.chatId === activeChat.id) void loadMessage(detail.messageId);
+    }
+    window.addEventListener(MESSAGE_EVENT, handleMessage);
+
+    void loadHistory()
       .catch((caughtError) => {
         if (active)
           setError(
@@ -44,49 +90,79 @@ export function ChatBox({
           );
       });
 
-    const channel = supabase
-      .channel(`dashboard-chat-${chat.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `chat_id=eq.${chat.id}`,
-        },
-        async (payload) => {
-          const { data } = await supabase
-            .from("messages")
-            .select(
-              "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
-            )
-            .eq("id", payload.new.id)
-            .single();
-          if (active && data)
-            setMessages((old) =>
-              old.some((item) => item.id === data.id)
-                ? old
-                : [...old, data as Message],
-            );
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "chats",
-          filter: `id=eq.${chat.id}`,
-        },
-        (payload) => {
-          if (active) setStatus(payload.new.status as Chat["status"]);
-        },
-      )
-      .subscribe();
+    async function subscribe() {
+      if (!active || connecting || channel) return;
+      connecting = true;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!active) return;
+      if (!session) {
+        connecting = false;
+        return;
+      }
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`dashboard-chat-${activeChat.id}-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages" },
+          (payload) => {
+            if (payload.new.chat_id === activeChat.id)
+              void loadMessage(payload.new.id as string);
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "chats",
+            filter: `id=eq.${activeChat.id}`,
+          },
+          (payload) => {
+            if (active) setStatus(payload.new.status as Chat["status"]);
+          },
+        )
+        .subscribe((status) => {
+          if (!active) return;
+          connecting = false;
+          if (status === "SUBSCRIBED") {
+            void loadHistory().catch((caughtError) => {
+              if (active)
+                setError(
+                  caughtError instanceof Error
+                    ? caughtError.message
+                    : "Unable to load messages.",
+                );
+            });
+          } else if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            const failedChannel = channel;
+            channel = null;
+            if (failedChannel) void supabase.removeChannel(failedChannel);
+            reconnectTimer = setTimeout(() => void subscribe(), 1000);
+          }
+        });
+    }
+
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))
+        void subscribe();
+    });
+    void subscribe();
 
     return () => {
       active = false;
-      void supabase.removeChannel(channel);
+      window.removeEventListener(MESSAGE_EVENT, handleMessage);
+      authSubscription.unsubscribe();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [chat, currentUserId]);
 
@@ -139,7 +215,7 @@ export function ChatBox({
     );
 
   return (
-    <section className="flex min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
+    <section className="flex h-[28rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] p-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-[var(--accent)]">
@@ -158,7 +234,7 @@ export function ChatBox({
           </button>
         )}
       </header>
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length ? (
           messages.map((message) => (
             <div
