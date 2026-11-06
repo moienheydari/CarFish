@@ -23,6 +23,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
     bio: profile?.bio ?? "",
   });
   const [gameCode, setGameCode] = useState(profile?.game_code ?? "");
+  const [joinedGameCode, setJoinedGameCode] = useState(profile?.game_code ?? "");
   const [canClaimGameMaster, setCanClaimGameMaster] = useState(false);
   const [canClaimDecoy, setCanClaimDecoy] = useState(false);
   const [message, setMessage] = useState("");
@@ -33,6 +34,10 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   const router = useRouter();
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!joinedGameCode) {
+      setError("Join a game before saving your profile.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     setError("");
@@ -103,6 +108,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Could not join game.");
       setGameCode(result.game_code);
+      setJoinedGameCode(result.game_code);
       setCanClaimGameMaster(result.can_claim_game_master);
       setCanClaimDecoy(result.can_claim_decoy);
       setMessage(`Joined game ${result.game_code}.`);

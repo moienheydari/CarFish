@@ -18,6 +18,10 @@ export function GameCreateModal({
   onCreated: (gameCode: string) => void;
 }) {
   const [hasDecoy, setHasDecoy] = useState(false);
+  const [correctScore, setCorrectScore] = useState(3);
+  const [existScore, setExistScore] = useState(1);
+  const [allowPrivateChats, setAllowPrivateChats] = useState(true);
+  const [decoyScore, setDecoyScore] = useState(3);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -28,6 +32,10 @@ export function GameCreateModal({
     setError("");
     setSuccess("");
     setHasDecoy(false);
+    setCorrectScore(3);
+    setExistScore(1);
+    setAllowPrivateChats(true);
+    setDecoyScore(3);
     onClose();
   }
 
@@ -38,7 +46,14 @@ export function GameCreateModal({
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_code: gameCode, has_decoy: hasDecoy }),
+        body: JSON.stringify({
+          game_code: gameCode,
+          has_decoy: hasDecoy,
+          correct_score: correctScore,
+          exist_score: existScore,
+          allow_private_chats: allowPrivateChats,
+          decoy_score: hasDecoy ? decoyScore : 0,
+        }),
       });
       const responseText = await response.text();
       let result: { game_code?: string; error?: string } = {};
@@ -57,6 +72,10 @@ export function GameCreateModal({
         onClose();
         setSuccess("");
         setHasDecoy(false);
+        setCorrectScore(3);
+        setExistScore(1);
+        setAllowPrivateChats(true);
+        setDecoyScore(3);
       }, 700);
     } catch (caughtError) {
       setError(
@@ -98,6 +117,52 @@ export function GameCreateModal({
           />
           Include a decoy
         </label>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <label className="text-sm">
+            Correct guess score
+            <input
+              type="number"
+              min={0}
+              value={correctScore}
+              onChange={(event) => setCorrectScore(Number(event.target.value))}
+              disabled={busy}
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2"
+            />
+          </label>
+          <label className="text-sm">
+            Existing but incorrect score
+            <input
+              type="number"
+              min={0}
+              value={existScore}
+              onChange={(event) => setExistScore(Number(event.target.value))}
+              disabled={busy}
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2"
+            />
+          </label>
+        </div>
+        <label className="mt-5 flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={allowPrivateChats}
+            onChange={(event) => setAllowPrivateChats(event.target.checked)}
+            disabled={busy}
+          />
+          Allow players to create private chats
+        </label>
+        {hasDecoy && (
+          <label className="mt-4 block text-sm">
+            Decoy favorite score
+            <input
+              type="number"
+              min={0}
+              value={decoyScore}
+              onChange={(event) => setDecoyScore(Number(event.target.value))}
+              disabled={busy}
+              className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2"
+            />
+          </label>
+        )}
         {error && (
           <p role="alert" className="mt-4 text-sm text-rose-300">
             {error}

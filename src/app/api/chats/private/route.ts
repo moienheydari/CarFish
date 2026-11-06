@@ -47,6 +47,15 @@ export async function POST(request: Request) {
       { error: "Private chats are limited to players in your game." },
       { status: 403 },
     );
+  const { data: game, error: gameError } = await supabase
+    .from("games")
+    .select("allow_private_chats")
+    .eq("game_code", gameCode)
+    .single();
+  if (gameError)
+    return NextResponse.json({ error: "Could not check private chat settings." }, { status: 500 });
+  if (!game.allow_private_chats)
+    return NextResponse.json({ error: "Private chats are currently disabled by the game master." }, { status: 403 });
 
   const { data: sharedMemberships } = await supabase
     .from("chat_members")

@@ -4,6 +4,10 @@ import { z } from "zod";
 export const createGameSchema = z.object({
   game_code: z.string().trim().length(4, "Game code must be exactly 4 characters.").regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
   has_decoy: z.boolean(),
+  correct_score: z.number().int().min(0).max(100000),
+  exist_score: z.number().int().min(0).max(100000),
+  allow_private_chats: z.boolean(),
+  decoy_score: z.number().int().min(0).max(100000),
 });
 export const gamePhaseSchema = z.enum(["not_started", "chat_phase", "vote_phase"]);
 export const profileSchema = z.object({
@@ -71,4 +75,13 @@ export const privateChatSchema = z.object({
     .trim()
     .length(4, "Game code must be exactly 4 characters.")
     .regex(/^[A-Za-z0-9]+$/, "Invalid game code."),
+});
+export const lockVoteSchema = z.object({
+  target_id: z.string().uuid(),
+  guess: z.string().trim().min(1).max(100),
+  vote_kind: z.enum(["guess", "decoy_favorite"]).default("guess"),
+});
+export const reviewVoteSchema = z.object({
+  vote_id: z.string().uuid(),
+  status: z.enum(["unlocked", "correct", "exists", "none"]),
 });

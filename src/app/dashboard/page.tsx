@@ -5,7 +5,10 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { GmPanel } from "@/components/gm-panel";
 import { GmChatModal } from "@/components/gm-chat-modal";
 import { PlayerPanel } from "@/components/player-panel";
-import type { Chat, GamePhase, Profile } from "@/types/database";
+import { IntroductionPanel } from "@/components/introduction-panel";
+import { VotePanel } from "@/components/vote-panel";
+import { GamePhaseSync } from "@/components/game-phase-sync";
+import type { Chat, GamePhase, Profile, Vote } from "@/types/database";
 
 export const instant = false;
 
@@ -27,7 +30,7 @@ export default async function DashboardPage() {
 
   const { data: game } = await supabase
     .from("games")
-    .select("phase")
+    .select("phase,correct_score,exist_score,allow_private_chats,decoy_favorite_id")
     .eq("game_code", profile.game_code)
     .single();
 
@@ -60,6 +63,10 @@ export default async function DashboardPage() {
     .eq("game_code", profile.game_code)
     .eq("is_gm", false)
     .order("display_name");
+  const { data: votes } = await supabase
+    .from("votes")
+    .select("*")
+    .eq("game_code", profile.game_code);
   const { data: userChats } = await supabase
     .from("chat_members")
     .select("chat_id,user_id");
@@ -77,8 +84,8 @@ export default async function DashboardPage() {
   const gmChat = profile.is_gm
     ? null
     : ((chatRows ?? []).find(
-        (chat) => chat.chat_type === "with_gm" && userChatsIds.has(chat.id),
-      ) as Chat | undefined) ?? null;
+      (chat) => chat.chat_type === "with_gm" && userChatsIds.has(chat.id),
+    ) as Chat | undefined) ?? null;
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-12">
       <div className="flex flex-wrap items-end justify-between gap-5">
@@ -90,28 +97,58 @@ export default async function DashboardPage() {
         </div>
         <SignOutButton />
       </div>
-      {profile.is_gm ? (
-        <GmPanel
-          players={(players ?? []) as Profile[]}
-          chats={chats}
-          currentUserId={user.id}
-          gameCode={profile.game_code}
-          initialPhase={(game?.phase ?? "not_started") as GamePhase}
-        />
-      ) : (
-        <>
-          <PlayerPanel
+      <GamePhaseSync gameCode={profile.game_code}>
+        {profile.is_gm ? (
+          <GmPanel
             players={(players ?? []) as Profile[]}
-            initialChats={chats}
-            initialChatMembers={userChats ?? []}
+            votes={(votes ?? []) as Vote[]}
+            chats={chats}
             currentUserId={user.id}
             gameCode={profile.game_code}
+            initialPhase={(game?.phase ?? "not_started") as GamePhase}
+            initialAllowPrivateChats={game?.allow_private_chats ?? true}
+            initialDecoyFavoriteId={game?.decoy_favorite_id ?? null}
           />
-          {gmChat && (
-            <GmChatModal chat={gmChat} currentUserId={user.id} />
-          )}
-        </>
-      )}
+        ) : (
+          <>
+            {game?.phase === "not_started" ? (
+              <>
+                <IntroductionPanel players={(players ?? []) as Profile[]} />
+                {gmChat && (
+                  <GmChatModal chat={gmChat} currentUserId={user.id} />
+                )}
+              </>
+            ) : game?.phase === "vote_phase" ? (
+              <>
+                <VotePanel
+                  players={(players ?? []) as Profile[]}
+                  currentUserId={user.id}
+                  gameCode={profile.game_code}
+                  isDecoy={profile.is_decoy}
+                  initialVotes={(votes ?? []) as Vote[]}
+                />
+                {gmChat && (
+                  <GmChatModal chat={gmChat} currentUserId={user.id} />
+                )}
+              </>
+            ) : (
+              <>
+                <PlayerPanel
+                  players={(players ?? []) as Profile[]}
+                  initialChats={chats}
+                  initialChatMembers={userChats ?? []}
+                  currentUserId={user.id}
+                  gameCode={profile.game_code}
+                  allowPrivateChats={game?.allow_private_chats ?? true}
+                />
+                {gmChat && (
+                  <GmChatModal chat={gmChat} currentUserId={user.id} />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </GamePhaseSync>
     </main>
   );
 }

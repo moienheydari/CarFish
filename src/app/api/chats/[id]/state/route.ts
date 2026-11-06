@@ -1,5 +1,25 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  const { id } = await params;
+  const { data, error } = await supabase
+    .from("chats")
+    .select("id,status")
+    .eq("id", id)
+    .single();
+  if (error || !data)
+    return NextResponse.json({ error: "Could not load chat status." }, { status: 404 });
+  return NextResponse.json(data);
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

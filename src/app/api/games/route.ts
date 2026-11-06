@@ -36,10 +36,35 @@ export async function POST(request: Request) {
 
   const { data: game, error } = await supabase
     .from("games")
-    .insert({ game_code: gameCode, has_decoy: parsed.data.has_decoy })
-    .select("game_code,phase,has_decoy")
+    .insert({
+      game_code: gameCode,
+      has_decoy: parsed.data.has_decoy,
+      correct_score: parsed.data.correct_score,
+      exist_score: parsed.data.exist_score,
+      allow_private_chats: parsed.data.allow_private_chats,
+      decoy_score: parsed.data.decoy_score,
+    })
+    .select("game_code,phase,has_decoy,correct_score,exist_score,allow_private_chats,decoy_score,decoy_favorite_id")
     .maybeSingle();
   if (!error && game) return NextResponse.json(game, { status: 201 });
+  if (error) {
+    console.error("Could not create game.", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+  }
+  if (error?.code === "42703")
+    return NextResponse.json(
+      { error: "The database is missing the latest game settings columns. Apply the current Supabase migrations." },
+      { status: 500 },
+    );
+  if (error?.code === "42501")
+    return NextResponse.json(
+      { error: "You are not allowed to create a game with the current database policies." },
+      { status: 403 },
+    );
   if (error?.code !== "23505")
     return NextResponse.json({ error: "Could not create game." }, { status: 500 });
 

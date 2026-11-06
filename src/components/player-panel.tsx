@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageCircle, UserRound } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
@@ -9,6 +9,7 @@ import {
   markChatRead,
 } from "@/hooks/use-unread-chat-counts";
 import type { Chat, Profile } from "@/types/database";
+import { createClient } from "@/lib/supabase/browser";
 
 export function PlayerPanel({
   players,
@@ -16,15 +17,18 @@ export function PlayerPanel({
   initialChatMembers,
   currentUserId,
   gameCode,
+  allowPrivateChats: initialAllowPrivateChats,
 }: {
   players: Profile[];
   initialChats: Chat[];
   initialChatMembers: { chat_id: string; user_id: string }[];
   currentUserId: string;
   gameCode: string;
+  allowPrivateChats: boolean;
 }) {
   const [chats, setChats] = useState(initialChats);
   const [chatMembers, setChatMembers] = useState(initialChatMembers);
+  const [allowPrivateChats, setAllowPrivateChats] = useState(initialAllowPrivateChats);
   const [selectedChatId, setSelectedChatId] = useState(
     initialChats.find((chat) => chat.chat_type === "public")?.id ??
     initialChats[0]?.id ??
@@ -35,6 +39,32 @@ export function PlayerPanel({
   const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
   const unreadCounts = useUnreadChatCounts(chats, currentUserId);
 
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+    async function subscribe() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active || !session) return;
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`player-game-settings-${gameCode}-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "games", filter: `game_code=eq.${gameCode}` },
+          (payload) => {
+            if (active) setAllowPrivateChats(Boolean(payload.new.allow_private_chats));
+          },
+        )
+        .subscribe();
+    }
+    void subscribe();
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [gameCode]);
+
   function selectChat(chatId: string) {
     markChatRead(currentUserId, chatId);
     setSelectedChatId(chatId);
@@ -42,6 +72,7 @@ export function PlayerPanel({
 
   async function openPrivateChat(player: Profile) {
     if (player.id === currentUserId) return;
+    if (!allowPrivateChats) return;
     setBusyPlayerId(player.id);
     setError("");
     const response = await fetch("/api/chats/private", {
@@ -169,12 +200,12 @@ export function PlayerPanel({
                   tabIndex={0}
                   onClick={() => {
                     if (privateChat) selectChat(privateChat.id);
-                    else void openPrivateChat(player);
+                    else if (allowPrivateChats) void openPrivateChat(player);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      openPrivateChat(player);
+                      if (allowPrivateChats) void openPrivateChat(player);
                     }
                   }}
                   className={`relative flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${
@@ -194,7 +225,7 @@ export function PlayerPanel({
                       ? "Opening..."
                       : hasPrivateChat(player.id)
                         ? "Open chat"
-                        : "Create chat"}
+                        : allowPrivateChats ? "Create chat" : "Private chats disabled"}
                   </span>
                   {privateChat && unreadCounts[privateChat.id] > 0 && (
                     <UnreadBadge count={unreadCounts[privateChat.id]} />

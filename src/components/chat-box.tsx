@@ -13,11 +13,13 @@ export function ChatBox({
   currentUserId,
   canSend,
   canManage,
+  canSendWhenClosed = false,
 }: {
   chat: Chat | null;
   currentUserId: string;
   canSend: boolean;
   canManage: boolean;
+  canSendWhenClosed?: boolean;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState("");
@@ -25,6 +27,13 @@ export function ChatBox({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Chat["status"]>(chat?.status ?? "locked");
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatId = chat?.id;
+
+  useEffect(() => {
+    if (!chatId || !canSend || status !== "open") return;
+    inputRef.current?.focus();
+  }, [chatId, canSend, status]);
 
   useEffect(() => {
     if (!chat) return;
@@ -36,6 +45,13 @@ export function ChatBox({
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let connecting = false;
+
+    async function loadStatus() {
+      const response = await fetch(`/api/chats/${activeChat.id}/state`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to load chat status.");
+      if (active) setStatus(result.status as Chat["status"]);
+    }
 
     function mergeMessages(
       existing: Message[],
@@ -89,6 +105,14 @@ export function ChatBox({
               : "Unable to load messages.",
           );
       });
+    void loadStatus().catch((caughtError) => {
+      if (active)
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Unable to load chat status.",
+        );
+    });
 
     async function subscribe() {
       if (!active || connecting || channel) return;
@@ -128,6 +152,14 @@ export function ChatBox({
           if (!active) return;
           connecting = false;
           if (status === "SUBSCRIBED") {
+            void loadStatus().catch((caughtError) => {
+              if (active)
+                setError(
+                  caughtError instanceof Error
+                    ? caughtError.message
+                    : "Unable to load chat status.",
+                );
+            });
             void loadHistory().catch((caughtError) => {
               if (active)
                 setError(
@@ -172,7 +204,7 @@ export function ChatBox({
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (!chat || !content.trim() || busy || status !== "open" || !canSend)
+    if (!chat || !content.trim() || busy || (!canSendWhenClosed && status !== "open") || !canSend)
       return;
     setBusy(true);
     setError("");
@@ -187,6 +219,7 @@ export function ChatBox({
         old.some((item) => item.id === result.id) ? old : [...old, result],
       );
       setContent("");
+      window.requestAnimationFrame(() => inputRef.current?.focus());
     } else setError(result.error ?? "Could not send message.");
     setBusy(false);
   }
@@ -219,8 +252,11 @@ export function ChatBox({
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] p-4">
         <div>
           <p className="text-xs uppercase tracking-wider text-[var(--accent)]">
-            {chat.chat_type} chat · {status}
+            {chat.chat_type} chat
           </p>
+          <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${status === "open" ? "bg-emerald-700 text-white" : "bg-rose-900 text-rose-100"}`}>
+            {status === "open" ? "Open for messages" : "Closed for players"}
+          </span>
           <h2 className="mt-1 font-semibold">{chat.name}</h2>
         </div>
         {canManage && (
@@ -257,7 +293,7 @@ export function ChatBox({
           ))
         ) : (
           <div className="grid h-full min-h-48 place-items-center text-center text-sm text-[var(--muted)]">
-            {status === "open" ? "No messages yet." : "This chat is closed."}
+            {status === "open" ? "No messages yet." : "This chat is closed to players."}
           </div>
         )}
         <div ref={endRef} />
@@ -267,10 +303,11 @@ export function ChatBox({
           {error}
         </p>
       )}
-      {canSend && status === "open" && (
+      {canSend && (status === "open" || canSendWhenClosed) && (
         <form onSubmit={send} className="border-t border-[var(--line)] p-3">
           <div className="flex gap-2">
             <textarea
+              ref={inputRef}
               value={content}
               onChange={(event) => setContent(event.target.value)}
               onKeyDown={(event) => {

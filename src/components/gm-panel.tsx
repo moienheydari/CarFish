@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageCircle, Users } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
@@ -8,7 +8,8 @@ import {
   markChatRead,
   useUnreadChatCounts,
 } from "@/hooks/use-unread-chat-counts";
-import type { Chat, GamePhase, Profile } from "@/types/database";
+import type { Chat, GamePhase, Profile, Vote, VoteStatus } from "@/types/database";
+import { createClient } from "@/lib/supabase/browser";
 
 export function GmPanel({
   players,
@@ -16,23 +17,116 @@ export function GmPanel({
   currentUserId,
   gameCode,
   initialPhase,
+  votes,
+  initialAllowPrivateChats,
+  initialDecoyFavoriteId,
 }: {
   players: Profile[];
   chats: Chat[];
   currentUserId: string;
   gameCode: string;
   initialPhase: GamePhase;
+  votes: Vote[];
+  initialAllowPrivateChats: boolean;
+  initialDecoyFavoriteId: string | null;
 }) {
   const [phase, setPhase] = useState(initialPhase);
   const [phaseError, setPhaseError] = useState("");
   const [phaseBusy, setPhaseBusy] = useState(false);
+  const [allowPrivateChats, setAllowPrivateChats] = useState(initialAllowPrivateChats);
+  const [decoyFavoriteId, setDecoyFavoriteId] = useState(initialDecoyFavoriteId);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewedVotes, setReviewedVotes] = useState(votes);
+  const [hiddenVoteIds, setHiddenVoteIds] = useState<Set<string>>(new Set());
+  const [gameChatsState, setGameChatsState] = useState(chats);
   const [selectedChatId, setSelectedChatId] = useState(
     chats.find((chat) => chat.chat_type === "public")?.id ?? chats[0]?.id ?? "",
   );
-  const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
-  const gameChats = chats.filter((chat) => chat.chat_type !== "with_gm");
-  const gmChats = chats.filter((chat) => chat.chat_type === "with_gm");
-  const unreadCounts = useUnreadChatCounts(chats, currentUserId);
+  const selectedChat = gameChatsState.find((chat) => chat.id === selectedChatId) ?? null;
+  const gameChats = gameChatsState.filter((chat) => chat.chat_type !== "with_gm");
+  const gmChats = gameChatsState.filter((chat) => chat.chat_type === "with_gm");
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+
+    async function subscribe() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active || !session) return;
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`gm-chats-${gameCode}-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "chats",
+            filter: `game_code=eq.${gameCode}`,
+          },
+          (payload) => {
+            if (!active) return;
+            if (payload.eventType === "DELETE") {
+              const deletedId = String(payload.old.id ?? "");
+              setGameChatsState((current) =>
+                current.filter((chat) => chat.id !== deletedId),
+              );
+              return;
+            }
+            const incoming = payload.new as Chat;
+            setGameChatsState((current) => [
+              ...current.filter((chat) => chat.id !== incoming.id),
+              incoming,
+            ]);
+          },
+        )
+        .subscribe();
+    }
+
+    void subscribe();
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [gameCode]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+    async function subscribe() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active || !session) return;
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`gm-votes-${gameCode}-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = String(payload.old.id ?? "");
+              setReviewedVotes((current) => current.filter((vote) => vote.id !== deletedId));
+              return;
+            }
+            const incoming = payload.new as Vote;
+            setReviewedVotes((current) => [
+              ...current.filter((vote) => vote.id !== incoming.id),
+              incoming,
+            ]);
+          },
+        )
+        .subscribe();
+    }
+    void subscribe();
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [gameCode]);
+  const unreadCounts = useUnreadChatCounts(gameChatsState, currentUserId);
+  const visibleVotes = reviewedVotes.filter((vote) => !hiddenVoteIds.has(vote.id));
 
   function selectChat(chatId: string) {
     markChatRead(currentUserId, chatId);
@@ -48,9 +142,50 @@ export function GmPanel({
       body: JSON.stringify({ phase: nextPhase }),
     });
     const result = await response.json();
-    if (response.ok) setPhase(result.phase as GamePhase);
+    if (response.ok) {
+      setPhase(result.phase as GamePhase);
+      setDecoyFavoriteId(result.decoy_favorite_id ?? null);
+    }
     else setPhaseError(result.error ?? "Could not update game phase.");
     setPhaseBusy(false);
+  }
+
+  async function togglePrivateChats() {
+    const nextValue = !allowPrivateChats;
+    setPhaseError("");
+    const response = await fetch(`/api/games/${gameCode}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allow_private_chats: nextValue }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setPhaseError(result.error ?? "Could not update private chat settings.");
+      return;
+    }
+    setAllowPrivateChats(nextValue);
+  }
+
+  async function reviewVote(voteId: string, status: VoteStatus) {
+    setReviewError("");
+    const response = await fetch(`/api/games/${gameCode}/votes`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vote_id: voteId, status }),
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      setReviewError(result.error ?? "Could not update vote.");
+      return;
+    }
+
+    setReviewedVotes((current) =>
+      current.map((vote) => vote.id === voteId ? { ...vote, status } : vote),
+    );
+  }
+
+  function clearDisplayedVotes() {
+    setHiddenVoteIds(new Set(reviewedVotes.map((vote) => vote.id)));
   }
 
   return (
@@ -59,19 +194,87 @@ export function GmPanel({
         <p className="text-sm text-[var(--accent)]">Game master panel</p>
         <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>
       </div>
+      {phase !== "vote_phase" && decoyFavoriteId && (
+        <div className="mb-5 rounded-2xl border border-[var(--accent)] bg-[#2a0a0a] p-4">
+          <p className="text-sm font-semibold text-[var(--accent)]">Decoy favorite</p>
+          <p className="mt-1">
+            {players.find((player) => player.id === decoyFavoriteId)?.display_name ?? "Unknown player"}
+          </p>
+        </div>
+      )}
+      <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+        <h3 className="font-semibold">Vote review</h3>
+        <div className="mt-3 space-y-2">
+          {visibleVotes.map((vote) => {
+            const voter = players.find((player) => player.id === vote.voter_id);
+            const target = players.find((player) => player.id === vote.target_id);
+            return (
+              <div key={vote.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--line)] p-3 text-sm">
+                <span className="font-medium">{voter?.display_name ?? "Unknown"}</span>
+                <span className="font-medium">({voter?.real_name ?? "Unknown"})</span>
+                <span className="text-[var(--muted)]">guessed</span>
+                <span className="font-medium">{target?.display_name ?? "Unknown"}</span>
+                <span className="font-medium">({target?.real_name ?? "Unknown"})</span>
+                <span className="text-[var(--muted)]">as {vote.guess}</span>
+                <span className="ml-auto rounded-full border border-[var(--line)] px-2 py-1 text-xs">
+                  {vote.status}
+                </span>
+                <div className="flex gap-2">
+                  {vote.status === "pending" && (
+                    <>
+                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="rounded-lg bg-emerald-700 px-2 py-1 text-xs">Correct</button>
+                      <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="rounded-lg bg-amber-700 px-2 py-1 text-xs">Exists</button>
+                      <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">None</button>
+                    </>
+                  )}
+                  {vote.status !== "unlocked" && (
+                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">Unlock</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {!visibleVotes.length && <p className="text-sm text-[var(--muted)]">No guesses to review.</p>}
+        </div>
+        {reviewError && <p role="alert" className="mt-2 text-sm text-rose-300">{reviewError}</p>}
+        {visibleVotes.length > 0 && (
+          <button
+            type="button"
+            onClick={clearDisplayedVotes}
+            className="mt-4 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
+          >
+            Clear displayed votes
+          </button>
+        )}
+      </div>
+      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+        <div>
+          <h3 className="font-semibold">Private player chats</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Players can always see existing chats, but this controls whether they can create new ones.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void togglePrivateChats()}
+          className={`rounded-xl px-3 py-2 text-sm font-semibold ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)]"}`}
+        >
+          {allowPrivateChats ? "Enabled" : "Disabled"}
+        </button>
+      </div>
       <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
         <label className="flex items-center justify-between gap-3 text-sm font-semibold">
-        Game phase
-        <select
-          value={phase}
-          onChange={(event) => void changePhase(event.target.value as GamePhase)}
-          disabled={phaseBusy}
-          className="rounded-lg border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm font-normal outline-none focus:border-[var(--accent)]"
-        >
-          <option value="not_started">Not started</option>
-          <option value="chat_phase">Chat phase</option>
-          <option value="vote_phase">Vote phase</option>
-        </select>
+          Game phase
+          <select
+            value={phase}
+            onChange={(event) => void changePhase(event.target.value as GamePhase)}
+            disabled={phaseBusy}
+            className="rounded-lg border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm font-normal outline-none focus:border-[var(--accent)]"
+          >
+            <option value="not_started">Not started</option>
+            <option value="chat_phase">Chat phase</option>
+            <option value="vote_phase">Vote phase</option>
+          </select>
         </label>
         {phaseError && (
           <p role="alert" className="mt-2 text-sm text-rose-300">
@@ -88,9 +291,26 @@ export function GmPanel({
             {players.map((player) => (
               <div key={player.id} className="flex items-center gap-3 rounded-xl p-2">
                 <Avatar profile={player} />
-                <span className="truncate text-sm">
-                  {player.display_name || "Unnamed player"}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {player.display_name || "Unnamed player"}
+                  </span>
+                  <span className="block truncate text-xs text-[var(--muted)]">
+                    Real name: {player.real_name || "Not provided"}
+                  </span>
+                    {player.is_decoy ? (
+                      <span className="mt-1 block text-xs font-semibold text-[var(--accent)]">
+                        Decoy
+                      </span>
+                    ) : (
+                      <div className="mt-1 flex gap-3 text-xs">
+                        <span>Total: {player.score}</span>
+                        <span className="text-[var(--accent)]">
+                          Current: {player.current_score}
+                        </span>
+                      </div>
+                    )}
+                </div>
               </div>
             ))}
             {!players.length && (
@@ -104,6 +324,7 @@ export function GmPanel({
           currentUserId={currentUserId}
           canSend
           canManage
+          canSendWhenClosed
         />
         <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">

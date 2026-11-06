@@ -1,11 +1,18 @@
 export type ChatType = "public" | "private" | "with_gm";
 export type ChatStatus = "open" | "locked";
 export type GamePhase = "not_started" | "chat_phase" | "vote_phase";
+export type VoteStatus = "unlocked" | "pending" | "correct" | "exists" | "none";
+export type VoteKind = "guess" | "decoy_favorite";
 
 export type Game = {
   game_code: string;
   phase: GamePhase;
   has_decoy: boolean;
+  allow_private_chats: boolean;
+  decoy_score: number;
+  decoy_favorite_id: string | null;
+  correct_score: number;
+  exist_score: number;
 };
 
 export type Profile = {
@@ -19,7 +26,20 @@ export type Profile = {
   is_gm: boolean;
   is_decoy: boolean;
   score: number;
+  current_score: number;
   game_code: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Vote = {
+  id: string;
+  game_code: string;
+  voter_id: string;
+  target_id: string;
+  guess: string;
+  status: VoteStatus;
+  vote_kind: VoteKind;
   created_at: string;
   updated_at: string;
 };

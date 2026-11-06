@@ -18,6 +18,21 @@ export async function PUT(request: Request) {
       { error: parsed.error.issues[0]?.message ?? "Invalid profile." },
       { status: 400 },
     );
+  const { data: existingProfile, error: existingProfileError } = await supabase
+    .from("profiles")
+    .select("game_code")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (existingProfileError)
+    return NextResponse.json(
+      { error: "Could not check your game membership." },
+      { status: 500 },
+    );
+  if (!existingProfile?.game_code)
+    return NextResponse.json(
+      { error: "Join a game before saving your profile." },
+      { status: 400 },
+    );
   const { data, error } = await supabase
     .from("profiles")
     .upsert({ id: user.id, ...parsed.data }, { onConflict: "id" })
