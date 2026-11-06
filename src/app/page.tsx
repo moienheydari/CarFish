@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
+import { connection } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import logo from "@/images/logo.png";
 
 export const instant = false;
 
 export default async function Home() {
+  await connection();
   const user = await getCurrentUser();
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 items-center px-5 py-20">

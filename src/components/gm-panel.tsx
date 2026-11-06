@@ -19,7 +19,6 @@ export function GmPanel({
   initialPhase,
   votes,
   initialAllowPrivateChats,
-  initialDecoyFavoriteId,
 }: {
   players: Profile[];
   chats: Chat[];
@@ -28,13 +27,12 @@ export function GmPanel({
   initialPhase: GamePhase;
   votes: Vote[];
   initialAllowPrivateChats: boolean;
-  initialDecoyFavoriteId: string | null;
 }) {
   const [phase, setPhase] = useState(initialPhase);
   const [phaseError, setPhaseError] = useState("");
   const [phaseBusy, setPhaseBusy] = useState(false);
+  const [chatStatusBusy, setChatStatusBusy] = useState(false);
   const [allowPrivateChats, setAllowPrivateChats] = useState(initialAllowPrivateChats);
-  const [decoyFavoriteId, setDecoyFavoriteId] = useState(initialDecoyFavoriteId);
   const [reviewError, setReviewError] = useState("");
   const [reviewedVotes, setReviewedVotes] = useState(votes);
   const [hiddenVoteIds, setHiddenVoteIds] = useState<Set<string>>(new Set());
@@ -144,7 +142,6 @@ export function GmPanel({
     const result = await response.json();
     if (response.ok) {
       setPhase(result.phase as GamePhase);
-      setDecoyFavoriteId(result.decoy_favorite_id ?? null);
     }
     else setPhaseError(result.error ?? "Could not update game phase.");
     setPhaseBusy(false);
@@ -164,6 +161,32 @@ export function GmPanel({
       return;
     }
     setAllowPrivateChats(nextValue);
+  }
+
+  const allGameChatsOpen =
+    gameChats.length > 0 && gameChats.every((chat) => chat.status === "open");
+
+  async function toggleAllGameChats() {
+    const nextStatus = allGameChatsOpen ? "locked" : "open";
+    setChatStatusBusy(true);
+    setPhaseError("");
+    const response = await fetch("/api/chats/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ game_code: gameCode, status: nextStatus }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setPhaseError(result.error ?? "Could not update game chat states.");
+      setChatStatusBusy(false);
+      return;
+    }
+    setGameChatsState((current) =>
+      current.map((chat) =>
+        chat.chat_type === "with_gm" ? chat : { ...chat, status: nextStatus },
+      ),
+    );
+    setChatStatusBusy(false);
   }
 
   async function reviewVote(voteId: string, status: VoteStatus) {
@@ -194,20 +217,13 @@ export function GmPanel({
         <p className="text-sm text-[var(--accent)]">Game master panel</p>
         <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>
       </div>
-      {phase !== "vote_phase" && decoyFavoriteId && (
-        <div className="mb-5 rounded-2xl border border-[var(--accent)] bg-[#2a0a0a] p-4">
-          <p className="text-sm font-semibold text-[var(--accent)]">Decoy favorite</p>
-          <p className="mt-1">
-            {players.find((player) => player.id === decoyFavoriteId)?.display_name ?? "Unknown player"}
-          </p>
-        </div>
-      )}
       <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
         <h3 className="font-semibold">Vote review</h3>
         <div className="mt-3 space-y-2">
           {visibleVotes.map((vote) => {
             const voter = players.find((player) => player.id === vote.voter_id);
             const target = players.find((player) => player.id === vote.target_id);
+            const isDecoyFavorite = vote.vote_kind === "decoy_favorite";
             return (
               <div key={vote.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--line)] p-3 text-sm">
                 <span className="font-medium">{voter?.display_name ?? "Unknown"}</span>
@@ -223,8 +239,12 @@ export function GmPanel({
                   {vote.status === "pending" && (
                     <>
                       <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="rounded-lg bg-emerald-700 px-2 py-1 text-xs">Correct</button>
-                      <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="rounded-lg bg-amber-700 px-2 py-1 text-xs">Exists</button>
-                      <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">None</button>
+                      {!isDecoyFavorite && (
+                        <>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="rounded-lg bg-amber-700 px-2 py-1 text-xs">Exists</button>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">None</button>
+                        </>
+                      )}
                     </>
                   )}
                   {vote.status !== "unlocked" && (
@@ -260,6 +280,22 @@ export function GmPanel({
           className={`rounded-xl px-3 py-2 text-sm font-semibold ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)]"}`}
         >
           {allowPrivateChats ? "Enabled" : "Disabled"}
+        </button>
+      </div>
+      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+        <div>
+          <h3 className="font-semibold">Game chats</h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Open or close all public and private chats. Player conversations with the GM are not affected.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void toggleAllGameChats()}
+          disabled={chatStatusBusy || !gameChats.length}
+          className="rounded-xl border border-[var(--accent)] px-3 py-2 text-sm font-semibold text-[var(--accent)] disabled:opacity-50"
+        >
+          {allGameChatsOpen ? "Close all chats" : "Open all chats"}
         </button>
       </div>
       <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
@@ -298,18 +334,18 @@ export function GmPanel({
                   <span className="block truncate text-xs text-[var(--muted)]">
                     Real name: {player.real_name || "Not provided"}
                   </span>
-                    {player.is_decoy ? (
-                      <span className="mt-1 block text-xs font-semibold text-[var(--accent)]">
-                        Decoy
+                  {player.is_decoy ? (
+                    <span className="mt-1 block text-xs font-semibold text-[var(--accent)]">
+                      Decoy
+                    </span>
+                  ) : (
+                    <div className="mt-1 flex gap-3 text-xs">
+                      <span>Total: {player.score}</span>
+                      <span className="text-[var(--accent)]">
+                        Current: {player.current_score}
                       </span>
-                    ) : (
-                      <div className="mt-1 flex gap-3 text-xs">
-                        <span>Total: {player.score}</span>
-                        <span className="text-[var(--accent)]">
-                          Current: {player.current_score}
-                        </span>
-                      </div>
-                    )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

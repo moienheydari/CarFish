@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import type { Profile, Vote } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
+import { ProfileButton } from "@/components/profile-modal";
 
 export function VotePanel({
   players,
@@ -27,6 +28,9 @@ export function VotePanel({
   );
   const [votes, setVotes] = useState(initialVotes);
   const [favoriteId, setFavoriteId] = useState(decoyVote?.target_id ?? "");
+  const [favoriteLocked, setFavoriteLocked] = useState(
+    Boolean(decoyVote && decoyVote.status !== "unlocked"),
+  );
   const [error, setError] = useState("");
   useEffect(() => {
     const supabase = createClient();
@@ -54,6 +58,8 @@ export function VotePanel({
               incoming,
             ]);
             if (incoming.vote_kind === "decoy_favorite")
+              setFavoriteLocked(incoming.status !== "unlocked");
+            if (incoming.vote_kind === "decoy_favorite")
               setFavoriteId(incoming.target_id);
             else
               setGuesses((current) => ({ ...current, [incoming.target_id]: incoming.guess }));
@@ -71,11 +77,6 @@ export function VotePanel({
     () => targets.filter((target) => votes.some((vote) => vote.target_id === target.id && vote.status !== "unlocked")).length,
     [targets, votes],
   );
-  const favoriteLocked = Boolean(
-    votes.find((vote) => vote.vote_kind === "decoy_favorite")?.status !== "unlocked" &&
-    votes.find((vote) => vote.vote_kind === "decoy_favorite"),
-  );
-
   async function lockGuess(targetId: string, voteKind: "guess" | "decoy_favorite" = "guess") {
     setError("");
     const response = await fetch(`/api/games/${gameCode}/votes`, {
@@ -89,6 +90,8 @@ export function VotePanel({
     });
     const result = await response.json();
     if (!response.ok) {
+      if (voteKind === "decoy_favorite" && response.status === 409)
+        setFavoriteLocked(true);
       setError(result.error ?? "Could not lock this guess.");
       return;
     }
@@ -106,6 +109,7 @@ export function VotePanel({
         updated_at: new Date().toISOString(),
       },
     ]);
+    if (voteKind === "decoy_favorite") setFavoriteLocked(true);
   }
 
   return (
@@ -121,35 +125,72 @@ export function VotePanel({
       </p>
       <div className="mt-6 space-y-3">
         {isDecoy ? (
-          <label className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3">
-            <select
-              value={favoriteId}
-              disabled={favoriteLocked}
-              onChange={(event) => setFavoriteId(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm"
-            >
-              <option value="">Choose a player</option>
-              {targets.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.display_name || "Unnamed player"}
-                </option>
-              ))}
-            </select>
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {targets.map((player) => {
+                const selected = favoriteId === player.id;
+                return (
+                  <div
+                    key={player.id}
+                    className={`relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                      selected
+                        ? "border-[var(--accent)] bg-[#2a0a0a]"
+                        : "border-[var(--line)]"
+                    }`}
+                  >
+                    <ProfileButton
+                      profile={player}
+                      className="absolute left-1 top-1 z-10"
+                    />
+                    <button
+                      type="button"
+                      disabled={favoriteLocked}
+                      onClick={() => setFavoriteId(player.id)}
+                      aria-pressed={selected}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-60"
+                    >
+                    {player.profile_image_url ? (
+                      <Image
+                        src={player.profile_image_url}
+                        alt=""
+                        width={48}
+                        height={48}
+                        unoptimized
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-lg font-semibold text-[var(--accent)]">
+                        {(player.display_name || "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0 truncate text-sm font-medium">
+                      {player.display_name || "Unnamed player"}
+                    </span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
             <button
               type="button"
               disabled={favoriteLocked || !favoriteId}
               onClick={() => void lockGuess(favoriteId, "decoy_favorite")}
-              className="rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[#050505] disabled:opacity-50"
+              className="mt-3 rounded-xl bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[#050505] disabled:opacity-50"
             >
               {favoriteLocked ? "Locked" : "Lock in"}
             </button>
-          </label>
+          </>
         ) : (
           targets.map((player) => {
           const vote = votes.find((item) => item.target_id === player.id);
           const locked = vote && vote.status !== "unlocked";
           return (
-            <label key={player.id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3">
+            <div key={player.id} className="relative">
+              <ProfileButton
+                profile={player}
+                className="absolute left-1 top-1 z-10"
+              />
+              <label className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3">
               {player.profile_image_url ? (
                 <Image src={player.profile_image_url} alt="" width={40} height={40} unoptimized className="h-10 w-10 rounded-full object-cover" />
               ) : (
@@ -173,7 +214,8 @@ export function VotePanel({
               >
                 {locked ? "Locked" : "Lock in"}
               </button>
-            </label>
+              </label>
+            </div>
           );
           })
         )}

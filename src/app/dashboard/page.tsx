@@ -62,7 +62,7 @@ export default async function DashboardPage() {
     .select("*")
     .eq("game_code", profile.game_code)
     .eq("is_gm", false)
-    .order("display_name");
+    .order("updated_at", { ascending: false });
   const { data: votes } = await supabase
     .from("votes")
     .select("*")
@@ -107,13 +107,15 @@ export default async function DashboardPage() {
             gameCode={profile.game_code}
             initialPhase={(game?.phase ?? "not_started") as GamePhase}
             initialAllowPrivateChats={game?.allow_private_chats ?? true}
-            initialDecoyFavoriteId={game?.decoy_favorite_id ?? null}
           />
         ) : (
           <>
             {game?.phase === "not_started" ? (
               <>
-                <IntroductionPanel players={(players ?? []) as Profile[]} />
+                <IntroductionPanel
+                  players={(players ?? []) as Profile[]}
+                  gameCode={profile.game_code}
+                />
                 {gmChat && (
                   <GmChatModal chat={gmChat} currentUserId={user.id} />
                 )}

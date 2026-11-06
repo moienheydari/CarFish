@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MessageCircle, UserRound } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
+import { ProfileButton } from "@/components/profile-modal";
 import {
   useUnreadChatCounts,
   markChatRead,
@@ -216,6 +217,7 @@ export function PlayerPanel({
                       : ""
                   }`}
                 >
+                  <ProfileButton profile={player} className="absolute left-1 top-1 z-10" />
                   <Avatar profile={player} />
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {player.display_name || "Unnamed player"}

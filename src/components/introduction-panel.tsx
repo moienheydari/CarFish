@@ -1,12 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { Profile } from "@/types/database";
+import { createClient } from "@/lib/supabase/browser";
 
-export function IntroductionPanel({ players }: { players: Profile[] }) {
+function sortPlayers(players: Profile[]) {
+  return [...players].sort(
+    (left, right) =>
+      new Date(right.updated_at).getTime() -
+      new Date(left.updated_at).getTime(),
+  );
+}
+
+export function IntroductionPanel({
+  players: initialPlayers,
+  gameCode,
+}: {
+  players: Profile[];
+  gameCode: string;
+}) {
+  const [players, setPlayers] = useState(() => sortPlayers(initialPlayers));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const player = players[selectedIndex] ?? null;
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+
+    async function subscribe() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!active || !session) return;
+
+      await supabase.realtime.setAuth(session.access_token);
+      channel = supabase
+        .channel(`profiles-${gameCode}-${crypto.randomUUID()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "profiles",
+            filter: `game_code=eq.${gameCode}`,
+          },
+          (payload) => {
+            if (!active) return;
+
+            if (payload.eventType === "DELETE") {
+              const deletedId = String(payload.old.id ?? "");
+              setPlayers((current) =>
+                current.filter((currentPlayer) => currentPlayer.id !== deletedId),
+              );
+              return;
+            }
+
+            const incoming = payload.new as Profile;
+            setPlayers((current) => {
+              const next = current.filter(
+                (currentPlayer) => currentPlayer.id !== incoming.id,
+              );
+              return incoming.is_gm ? next : sortPlayers([...next, incoming]);
+            });
+          },
+        )
+        .subscribe();
+    }
+
+    void subscribe();
+    return () => {
+      active = false;
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [gameCode]);
 
   if (!player)
     return (
