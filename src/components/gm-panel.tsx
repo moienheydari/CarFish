@@ -8,17 +8,24 @@ import {
   markChatRead,
   useUnreadChatCounts,
 } from "@/hooks/use-unread-chat-counts";
-import type { Chat, Profile } from "@/types/database";
+import type { Chat, GamePhase, Profile } from "@/types/database";
 
 export function GmPanel({
   players,
   chats,
   currentUserId,
+  gameCode,
+  initialPhase,
 }: {
   players: Profile[];
   chats: Chat[];
   currentUserId: string;
+  gameCode: string;
+  initialPhase: GamePhase;
 }) {
+  const [phase, setPhase] = useState(initialPhase);
+  const [phaseError, setPhaseError] = useState("");
+  const [phaseBusy, setPhaseBusy] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState(
     chats.find((chat) => chat.chat_type === "public")?.id ?? chats[0]?.id ?? "",
   );
@@ -32,11 +39,45 @@ export function GmPanel({
     setSelectedChatId(chatId);
   }
 
+  async function changePhase(nextPhase: GamePhase) {
+    setPhaseBusy(true);
+    setPhaseError("");
+    const response = await fetch(`/api/games/${gameCode}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phase: nextPhase }),
+    });
+    const result = await response.json();
+    if (response.ok) setPhase(result.phase as GamePhase);
+    else setPhaseError(result.error ?? "Could not update game phase.");
+    setPhaseBusy(false);
+  }
+
   return (
     <section className="mt-10">
       <div className="mb-5">
         <p className="text-sm text-[var(--accent)]">Game master panel</p>
         <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>
+      </div>
+      <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
+        <label className="flex items-center justify-between gap-3 text-sm font-semibold">
+        Game phase
+        <select
+          value={phase}
+          onChange={(event) => void changePhase(event.target.value as GamePhase)}
+          disabled={phaseBusy}
+          className="rounded-lg border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm font-normal outline-none focus:border-[var(--accent)]"
+        >
+          <option value="not_started">Not started</option>
+          <option value="chat_phase">Chat phase</option>
+          <option value="vote_phase">Vote phase</option>
+        </select>
+        </label>
+        {phaseError && (
+          <p role="alert" className="mt-2 text-sm text-rose-300">
+            {phaseError}
+          </p>
+        )}
       </div>
       <div className="grid gap-5 lg:grid-cols-[220px_1fr_260px]">
         <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">

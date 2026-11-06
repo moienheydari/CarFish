@@ -5,7 +5,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { GmPanel } from "@/components/gm-panel";
 import { GmChatModal } from "@/components/gm-chat-modal";
 import { PlayerPanel } from "@/components/player-panel";
-import type { Chat, Profile } from "@/types/database";
+import type { Chat, GamePhase, Profile } from "@/types/database";
 
 export const instant = false;
 
@@ -24,6 +24,12 @@ export default async function DashboardPage() {
         </a>
       </main>
     );
+
+  const { data: game } = await supabase
+    .from("games")
+    .select("phase")
+    .eq("game_code", profile.game_code)
+    .single();
 
   let { data: chatRows } = await supabase
     .from("chats")
@@ -89,6 +95,8 @@ export default async function DashboardPage() {
           players={(players ?? []) as Profile[]}
           chats={chats}
           currentUserId={user.id}
+          gameCode={profile.game_code}
+          initialPhase={(game?.phase ?? "not_started") as GamePhase}
         />
       ) : (
         <>

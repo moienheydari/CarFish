@@ -78,6 +78,7 @@ for each row execute function public.enforce_private_chat_members_limit();
 
 drop policy if exists "authenticated users read games" on public.games;
 drop policy if exists "authenticated users create games" on public.games;
+drop policy if exists "game masters update games" on public.games;
 drop policy if exists "profiles are public to authenticated users" on public.profiles;
 drop policy if exists "users create own profile" on public.profiles;
 drop policy if exists "users update own profile" on public.profiles;
@@ -105,6 +106,26 @@ for select to authenticated using (true);
 create policy "authenticated users create games" on public.games
 for insert to authenticated
 with check (true);
+create policy "game masters update games" on public.games
+for update to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles gm
+    where gm.id = (select auth.uid())
+      and gm.is_gm = true
+      and gm.game_code = games.game_code
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.profiles gm
+    where gm.id = (select auth.uid())
+      and gm.is_gm = true
+      and gm.game_code = games.game_code
+  )
+);
 create policy "profiles are public to authenticated users" on public.profiles
 for select to authenticated using (true);
 create policy "users create own profile" on public.profiles

@@ -5,6 +5,7 @@ export const createGameSchema = z.object({
   game_code: z.string().trim().length(4, "Game code must be exactly 4 characters.").regex(/^[A-Za-z0-9]+$/, "Game code must use only letters and numbers."),
   has_decoy: z.boolean(),
 });
+export const gamePhaseSchema = z.enum(["not_started", "chat_phase", "vote_phase"]);
 export const profileSchema = z.object({
   real_name: z.string().trim().max(100, "Real name is too long.").optional().default(""),
   display_name: z
