@@ -153,7 +153,7 @@ export async function PATCH(request: Request) {
           .from("chats")
           .insert({
             game_code: game.game_code,
-            name: `${currentProfile.display_name || "Unnamed player"} Chat with GM`,
+            name: `${(currentProfile.display_name || "Unnamed player").slice(0, 54)} & GM`,
             description: "A private conversation with the game master.",
             chat_type: "with_gm",
             created_by: user.id,

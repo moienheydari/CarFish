@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     .from("chats")
     .insert({
       game_code: gameCode,
-      name: `Chat for ${currentProfile.display_name || "Unnamed player"} & ${recipientProfile.display_name || "Unnamed player"}`,
+      name: `${(currentProfile.display_name || "Unnamed player").slice(0, 28)} & ${(recipientProfile.display_name || "Unnamed player").slice(0, 28)}`,
       description: "A private player conversation.",
       chat_type: "private",
       created_by: user.id,

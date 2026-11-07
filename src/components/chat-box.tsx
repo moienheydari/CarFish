@@ -6,7 +6,7 @@ import {
   markChatRead,
   MESSAGE_EVENT,
 } from "@/hooks/use-unread-chat-counts";
-import type { Chat, Message } from "@/types/database";
+import type { Chat, Message, Profile } from "@/types/database";
 
 export function ChatBox({
   chat,
@@ -14,21 +14,33 @@ export function ChatBox({
   canSend,
   canManage,
   canSendWhenClosed = false,
+  mentionableProfiles,
 }: {
   chat: Chat | null;
   currentUserId: string;
   canSend: boolean;
   canManage: boolean;
   canSendWhenClosed?: boolean;
+  mentionableProfiles?: Profile[];
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mentionContext, setMentionContext] = useState<{ start: number; end: number; query: string } | null>(null);
+  const [highlightedMention, setHighlightedMention] = useState(0);
   const [status, setStatus] = useState<Chat["status"]>(chat?.status ?? "locked");
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatId = chat?.id;
+  const mentionSuggestions = mentionContext
+    ? (mentionableProfiles ?? [])
+      .filter((profile) => profile.id !== currentUserId && profile.display_name?.trim())
+      .filter((profile) =>
+        profile.display_name!.toLocaleLowerCase().startsWith(mentionContext.query.toLocaleLowerCase()),
+      )
+      .slice(0, 6)
+    : [];
 
   useEffect(() => {
     if (!chatId || !canSend || status !== "open") return;
@@ -224,6 +236,57 @@ export function ChatBox({
     setBusy(false);
   }
 
+  function updateMentionContext(value: string, cursor: number) {
+    const beforeCursor = value.slice(0, cursor);
+    const match = beforeCursor.match(/(?:^|\s)@([^\s@]*)$/);
+    if (!match) {
+      setMentionContext(null);
+      return;
+    }
+    const queryStart = cursor - match[1].length;
+    setMentionContext({ start: queryStart - 1, end: cursor, query: match[1] });
+    setHighlightedMention(0);
+  }
+
+  function chooseMention(profile: Profile) {
+    if (!mentionContext) return;
+    const mention = `@${profile.display_name} `;
+    const nextContent =
+      content.slice(0, mentionContext.start) +
+      mention +
+      content.slice(mentionContext.end);
+    const nextCursor = mentionContext.start + mention.length;
+    setContent(nextContent);
+    setMentionContext(null);
+    setHighlightedMention(0);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
+  function renderMessageContent(messageContent: string) {
+    const mentionNames = (mentionableProfiles ?? [])
+      .map((profile) => profile.display_name?.trim())
+      .filter((name): name is string => Boolean(name))
+      .sort((left, right) => right.length - left.length);
+    if (!mentionNames.length) return messageContent;
+
+    const escapedNames = mentionNames.map((name) =>
+      name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    );
+    const mentionPattern = new RegExp(`(@(?:${escapedNames.join("|")}))`, "g");
+    return messageContent.split(mentionPattern).map((part, index) =>
+      index % 2 === 1 ? (
+        <span key={`${part}-${index}`} className="text-blue-400">
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    );
+  }
+
   async function toggleStatus() {
     if (!chat) return;
     setBusy(true);
@@ -285,9 +348,9 @@ export function ChatBox({
                 })}
               </p>
               <p
-                className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${message.sender_id === currentUserId ? "rounded-tr-sm bg-[var(--accent)] text-[#050505]" : "rounded-tl-sm bg-[#2a0a0a]"}`}
+                className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm ${message.sender_id === currentUserId ? "rounded-tr-sm bg-[#770404] text-[#f8eaea]" : "rounded-tl-sm bg-[#2a0a0a]"}`}
               >
-                {message.content}
+                {renderMessageContent(message.content)}
               </p>
             </div>
           ))
@@ -306,21 +369,68 @@ export function ChatBox({
       {canSend && (status === "open" || canSendWhenClosed) && (
         <form onSubmit={send} className="border-t border-[var(--line)] p-3">
           <div className="flex gap-2">
-            <textarea
-              ref={inputRef}
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              maxLength={500}
-              rows={1}
-              placeholder="Write a message..."
-              className="min-w-0 flex-1 resize-none rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-            />
+            <div className="relative min-w-0 flex-1">
+              {mentionSuggestions.length > 0 && (
+                <ul
+                  role="listbox"
+                  aria-label="Mention someone"
+                  className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-[var(--line)] bg-[#050505] shadow-lg"
+                >
+                  {mentionSuggestions.map((profile, index) => (
+                    <li key={profile.id} role="option" aria-selected={index === highlightedMention}>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          chooseMention(profile);
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${index === highlightedMention ? "bg-[#2a0a0a]" : "hover:bg-[#2a0a0a]"}`}
+                      >
+                        <span>@{profile.display_name}</span>
+                        {profile.is_gm && <span className="text-xs text-[var(--muted)]">GM</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <textarea
+                ref={inputRef}
+                value={content}
+                onChange={(event) => {
+                  setContent(event.target.value);
+                  updateMentionContext(event.target.value, event.target.selectionStart);
+                }}
+                onKeyDown={(event) => {
+                  if (mentionSuggestions.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                    event.preventDefault();
+                    setHighlightedMention((current) =>
+                      event.key === "ArrowDown"
+                        ? (current + 1) % mentionSuggestions.length
+                        : (current - 1 + mentionSuggestions.length) % mentionSuggestions.length,
+                    );
+                    return;
+                  }
+                  if (mentionSuggestions.length > 0 && (event.key === "Enter" || event.key === "Tab")) {
+                    event.preventDefault();
+                    chooseMention(mentionSuggestions[highlightedMention]);
+                    return;
+                  }
+                  if (event.key === "Escape" && mentionContext) {
+                    event.preventDefault();
+                    setMentionContext(null);
+                    return;
+                  }
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                maxLength={500}
+                rows={1}
+                placeholder="Write a message..."
+                className="w-full resize-none rounded-xl border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              />
+            </div>
             <button
               disabled={busy}
               className="rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-[#050505] disabled:opacity-50"

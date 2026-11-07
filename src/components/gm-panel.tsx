@@ -19,6 +19,7 @@ export function GmPanel({
   initialPhase,
   votes,
   initialAllowPrivateChats,
+  mentionableProfiles,
 }: {
   players: Profile[];
   chats: Chat[];
@@ -27,6 +28,7 @@ export function GmPanel({
   initialPhase: GamePhase;
   votes: Vote[];
   initialAllowPrivateChats: boolean;
+  mentionableProfiles: Profile[];
 }) {
   const [phase, setPhase] = useState(initialPhase);
   const [phaseError, setPhaseError] = useState("");
@@ -124,7 +126,13 @@ export function GmPanel({
     };
   }, [gameCode]);
   const unreadCounts = useUnreadChatCounts(gameChatsState, currentUserId);
-  const visibleVotes = reviewedVotes.filter((vote) => !hiddenVoteIds.has(vote.id));
+  const visibleVotes = reviewedVotes
+    .filter((vote) => !hiddenVoteIds.has(vote.id))
+    .sort((left, right) => {
+      if (left.status === "pending" && right.status !== "pending") return -1;
+      if (left.status !== "pending" && right.status === "pending") return 1;
+      return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+    });
 
   function selectChat(chatId: string) {
     markChatRead(currentUserId, chatId);
@@ -186,6 +194,9 @@ export function GmPanel({
         chat.chat_type === "with_gm" ? chat : { ...chat, status: nextStatus },
       ),
     );
+    if (nextStatus === "locked" && allowPrivateChats) {
+      await togglePrivateChats();
+    }
     setChatStatusBusy(false);
   }
 
@@ -205,6 +216,9 @@ export function GmPanel({
     setReviewedVotes((current) =>
       current.map((vote) => vote.id === voteId ? { ...vote, status } : vote),
     );
+    if (status === "unlocked") {
+      setHiddenVoteIds((current) => new Set(current).add(voteId));
+    }
   }
 
   function clearDisplayedVotes() {
@@ -218,8 +232,19 @@ export function GmPanel({
         <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>
       </div>
       <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-        <h3 className="font-semibold">Vote review</h3>
-        <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-semibold">Vote review</h3>
+          {visibleVotes.length > 0 && (
+            <button
+              type="button"
+              onClick={clearDisplayedVotes}
+              className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
+            >
+              Clear displayed votes
+            </button>
+          )}
+        </div>
+        <div className="mt-3 max-h-[20rem] space-y-2 overflow-y-auto pr-1">
           {visibleVotes.map((vote) => {
             const voter = players.find((player) => player.id === vote.voter_id);
             const target = players.find((player) => player.id === vote.target_id);
@@ -257,15 +282,6 @@ export function GmPanel({
           {!visibleVotes.length && <p className="text-sm text-[var(--muted)]">No guesses to review.</p>}
         </div>
         {reviewError && <p role="alert" className="mt-2 text-sm text-rose-300">{reviewError}</p>}
-        {visibleVotes.length > 0 && (
-          <button
-            type="button"
-            onClick={clearDisplayedVotes}
-            className="mt-4 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
-          >
-            Clear displayed votes
-          </button>
-        )}
       </div>
       <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
         <div>
@@ -360,6 +376,7 @@ export function GmPanel({
           currentUserId={currentUserId}
           canSend
           canManage
+          mentionableProfiles={mentionableProfiles}
           canSendWhenClosed
         />
         <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">

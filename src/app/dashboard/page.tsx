@@ -44,7 +44,7 @@ export default async function DashboardPage() {
   if (profile.is_gm && !chatRows?.some((chat) => chat.chat_type === "public")) {
     await supabase.from("chats").insert({
       game_code: profile.game_code,
-      name: "Public game chat",
+      name: "Public Chat",
       description: "The shared chat for this game (${{ profile.game_code }}).",
       chat_type: "public",
       created_by: user.id,
@@ -57,12 +57,12 @@ export default async function DashboardPage() {
     chatRows = refreshed.data;
   }
 
-  const { data: players } = await supabase
+  const { data: profiles } = await supabase
     .from("profiles")
     .select("*")
     .eq("game_code", profile.game_code)
-    .eq("is_gm", false)
     .order("updated_at", { ascending: false });
+  const players = (profiles ?? []).filter((item) => !item.is_gm);
   const { data: votes } = await supabase
     .from("votes")
     .select("*")
@@ -107,6 +107,7 @@ export default async function DashboardPage() {
             gameCode={profile.game_code}
             initialPhase={(game?.phase ?? "not_started") as GamePhase}
             initialAllowPrivateChats={game?.allow_private_chats ?? true}
+            mentionableProfiles={(profiles ?? []) as Profile[]}
           />
         ) : (
           <>
@@ -142,6 +143,7 @@ export default async function DashboardPage() {
                   currentUserId={user.id}
                   gameCode={profile.game_code}
                   allowPrivateChats={game?.allow_private_chats ?? true}
+                  mentionableProfiles={(profiles ?? []) as Profile[]}
                 />
                 {gmChat && (
                   <GmChatModal chat={gmChat} currentUserId={user.id} />

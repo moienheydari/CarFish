@@ -477,6 +477,8 @@ set search_path = public
 as $$
 declare
   game_row public.games;
+  gm_id uuid;
+  favorite_target_id uuid;
 begin
   select g.* into game_row
   from public.games g
@@ -502,6 +504,20 @@ begin
   end if;
 
   if game_row.phase = 'vote_phase' and p_phase <> 'vote_phase' then
+    select p.id into gm_id
+    from public.profiles p
+    where p.game_code = p_game_code
+      and p.is_gm = true
+    limit 1;
+
+    select favorite.target_id into favorite_target_id
+    from public.votes favorite
+    where favorite.game_code = p_game_code
+      and favorite.vote_kind = 'decoy_favorite'
+      and favorite.status <> 'unlocked'
+    order by favorite.updated_at desc
+    limit 1;
+
     update public.profiles p
     set current_score = totals.points,
         score = p.score + totals.points
@@ -529,33 +545,79 @@ begin
     update public.profiles target
     set current_score = target.current_score + game_row.decoy_score,
         score = target.score + game_row.decoy_score
-    from public.votes favorite
-    where favorite.game_code = p_game_code
-      and favorite.vote_kind = 'decoy_favorite'
-      and favorite.status <> 'unlocked'
-      and favorite.id = (
-        select latest.id
-        from public.votes latest
-        where latest.game_code = p_game_code
-          and latest.vote_kind = 'decoy_favorite'
-          and latest.status <> 'unlocked'
-        order by latest.updated_at desc
-        limit 1
-      )
-      and target.id = favorite.target_id
+    where target.id = favorite_target_id
       and target.is_gm = false;
 
     update public.games
-    set decoy_favorite_id = (
-      select favorite.target_id
-      from public.votes favorite
-      where favorite.game_code = p_game_code
-        and favorite.vote_kind = 'decoy_favorite'
-        and favorite.status <> 'unlocked'
-      order by favorite.updated_at desc
-      limit 1
-    )
+    set decoy_favorite_id = favorite_target_id
     where game_code = p_game_code;
+
+    insert into public.chats (
+      game_code,
+      name,
+      description,
+      created_by,
+      chat_type
+    )
+    select
+      p_game_code,
+      format('%s & GM', left(coalesce(player.display_name, 'Unnamed player'), 54)),
+      'A private conversation with the game master.',
+      player.id,
+      'with_gm'
+    from public.profiles player
+    where player.game_code = p_game_code
+      and player.is_gm = false
+      and not exists (
+        select 1
+        from public.chats existing_chat
+        where existing_chat.game_code = p_game_code
+          and existing_chat.chat_type = 'with_gm'
+          and existing_chat.created_by = player.id
+      );
+
+    insert into public.chat_members (chat_id, user_id)
+    select c.id, member.id
+    from public.chats c
+    join public.profiles member
+      on member.game_code = p_game_code
+     and (member.id = c.created_by or member.is_gm = true)
+    where c.game_code = p_game_code
+      and c.chat_type = 'with_gm'
+    on conflict (chat_id, user_id) do nothing;
+
+    insert into public.messages (chat_id, sender_id, content)
+    select
+      c.id,
+      gm_id,
+      format(
+        'Round results: You guessed %s person%s exactly correctly. You guessed %s person%s that existed in the game but for the wrong character.',
+        count(*) filter (where v.vote_kind = 'guess' and v.status = 'correct'),
+        case when count(*) filter (where v.vote_kind = 'guess' and v.status = 'correct') = 1 then '' else 's' end,
+        count(*) filter (where v.vote_kind = 'guess' and v.status = 'exists'),
+        case when count(*) filter (where v.vote_kind = 'guess' and v.status = 'exists') = 1 then '' else 's' end
+      )
+    from public.chats c
+    join public.profiles player on player.id = c.created_by
+    left join public.votes v
+      on v.voter_id = player.id
+     and v.game_code = p_game_code
+    where c.game_code = p_game_code
+      and c.chat_type = 'with_gm'
+      and player.is_gm = false
+      and player.is_decoy = false
+    group by c.id;
+
+    insert into public.messages (chat_id, sender_id, content)
+    select
+      c.id,
+      gm_id,
+      'This Round, You were chosen as the favorite character.'
+    from public.chats c
+    join public.profiles player on player.id = c.created_by
+    where c.game_code = p_game_code
+      and c.chat_type = 'with_gm'
+      and player.id = favorite_target_id;
   end if;
 
   update public.games

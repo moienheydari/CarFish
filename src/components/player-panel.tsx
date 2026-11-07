@@ -19,6 +19,7 @@ export function PlayerPanel({
   currentUserId,
   gameCode,
   allowPrivateChats: initialAllowPrivateChats,
+  mentionableProfiles,
 }: {
   players: Profile[];
   initialChats: Chat[];
@@ -26,6 +27,7 @@ export function PlayerPanel({
   currentUserId: string;
   gameCode: string;
   allowPrivateChats: boolean;
+  mentionableProfiles: Profile[];
 }) {
   const [chats, setChats] = useState(initialChats);
   const [chatMembers, setChatMembers] = useState(initialChatMembers);
@@ -162,6 +164,7 @@ export function PlayerPanel({
             currentUserId={currentUserId}
             canSend
             canManage={false}
+            mentionableProfiles={mentionableProfiles}
           />
         </div>
         <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
@@ -172,14 +175,14 @@ export function PlayerPanel({
             {publicChat && (
               <div
                 onClick={() => selectChat(publicChat.id)}
-                className={`relative flex w-full items-center gap-3 rounded-xl border p-2 pr-8 text-left ${selectedChatId === publicChat.id ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                className={`relative flex w-full cursor-pointer items-center gap-3 rounded-xl border p-2 pr-8 text-left ${selectedChatId === publicChat.id ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-[#050505]">
                   <MessageCircle size={18} />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">
-                    Public game chat
+                    Public Chat
                   </span>
                   <span className="block text-xs text-[var(--muted)]">
                     {publicChat.status === "open" ? "Open" : "Closed"}
@@ -195,44 +198,42 @@ export function PlayerPanel({
               .map((player) => {
                 const privateChat = getPrivateChat(player.id);
                 return (
-                <div
-                  key={player.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    if (privateChat) selectChat(privateChat.id);
-                    else if (allowPrivateChats) void openPrivateChat(player);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      if (allowPrivateChats) void openPrivateChat(player);
-                    }
-                  }}
-                  className={`relative flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${
-                    busyPlayerId === player.id ? "pointer-events-none opacity-50" : ""
-                  } ${
-                    isPrivateChatSelected(player.id)
-                      ? "border-[var(--accent)] bg-[#2a0a0a]"
-                      : ""
-                  }`}
-                >
-                  <ProfileButton profile={player} className="absolute left-1 top-1 z-10" />
-                  <Avatar profile={player} />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {player.display_name || "Unnamed player"}
-                  </span>
-                  <span className="shrink-0 text-xs text-[var(--accent)]">
-                    {busyPlayerId === player.id
-                      ? "Opening..."
-                      : hasPrivateChat(player.id)
-                        ? "Open chat"
-                        : allowPrivateChats ? "Create chat" : "Private chats disabled"}
-                  </span>
-                  {privateChat && unreadCounts[privateChat.id] > 0 && (
-                    <UnreadBadge count={unreadCounts[privateChat.id]} />
-                  )}
-                </div>
+                  <div
+                    key={player.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (privateChat) selectChat(privateChat.id);
+                      else if (allowPrivateChats) void openPrivateChat(player);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        if (allowPrivateChats) void openPrivateChat(player);
+                      }
+                    }}
+                    className={`relative flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${busyPlayerId === player.id ? "pointer-events-none opacity-50" : ""
+                      } ${isPrivateChatSelected(player.id)
+                        ? "border-[var(--accent)] bg-[#2a0a0a]"
+                        : ""
+                      }`}
+                  >
+                    <ProfileButton profile={player} className="absolute left-1 top-1 z-10" />
+                    <Avatar profile={player} />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {player.display_name || "Unnamed player"}
+                    </span>
+                    <span className="shrink-0 text-xs text-[var(--accent)]">
+                      {busyPlayerId === player.id
+                        ? "Opening..."
+                        : hasPrivateChat(player.id)
+                          ? "Open"
+                          : allowPrivateChats ? "Create" : ""}
+                    </span>
+                    {privateChat && unreadCounts[privateChat.id] > 0 && (
+                      <UnreadBadge count={unreadCounts[privateChat.id]} />
+                    )}
+                  </div>
                 );
               })}
             {!players.length && (
