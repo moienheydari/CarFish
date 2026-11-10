@@ -22,11 +22,20 @@ export async function POST(
     return NextResponse.json({ error: "You cannot vote in this game." }, { status: 403 });
   if (parsed.data.vote_kind === "decoy_favorite" && !voterProfile.is_decoy)
     return NextResponse.json({ error: "Only the decoy can choose a favorite." }, { status: 403 });
+  const { data: round, error: roundError } = await supabase
+    .from("rounds")
+    .select("id")
+    .eq("game_code", gameCode)
+    .eq("status", "active")
+    .single();
+  if (roundError || !round)
+    return NextResponse.json({ error: "No active round is available." }, { status: 409 });
   const voteKind = parsed.data.vote_kind;
   let existingVoteQuery = supabase
     .from("votes")
     .select("id,status")
     .eq("game_code", gameCode)
+    .eq("round_id", round.id)
     .eq("voter_id", user.id)
     .eq("vote_kind", voteKind)
     .eq("status", "pending")
@@ -40,6 +49,7 @@ export async function POST(
 
   const { data, error } = await supabase.from("votes").insert({
       game_code: gameCode,
+      round_id: round.id,
       voter_id: user.id,
       target_id: parsed.data.target_id,
       guess: voteKind === "decoy_favorite" ? "favorite" : parsed.data.guess,

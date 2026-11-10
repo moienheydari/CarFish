@@ -64,10 +64,17 @@ export default async function DashboardPage() {
     .eq("game_code", profile.game_code)
     .order("updated_at", { ascending: false });
   const players = (profiles ?? []).filter((item) => !item.is_gm);
+  const { data: activeRound } = await supabase
+    .from("rounds")
+    .select("id")
+    .eq("game_code", profile.game_code)
+    .eq("status", "active")
+    .maybeSingle();
   const { data: votes } = await supabase
     .from("votes")
     .select("*")
-    .eq("game_code", profile.game_code);
+    .eq("game_code", profile.game_code)
+    .eq("round_id", activeRound?.id ?? "");
   const { data: finalGuessCounts } =
     game?.phase === "final"
       ? await supabase.rpc("get_final_guess_counts", {
@@ -143,6 +150,7 @@ export default async function DashboardPage() {
                   players={(players ?? []) as Profile[]}
                   currentUserId={user.id}
                   gameCode={profile.game_code}
+                  roundId={activeRound?.id ?? ""}
                   isDecoy={profile.is_decoy}
                   initialVotes={(votes ?? []) as Vote[]}
                 />

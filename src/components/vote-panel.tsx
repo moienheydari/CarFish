@@ -12,12 +12,14 @@ export function VotePanel({
   players,
   currentUserId,
   gameCode,
+  roundId,
   isDecoy,
   initialVotes,
 }: {
   players: Profile[];
   currentUserId: string;
   gameCode: string;
+  roundId: string;
   isDecoy: boolean;
   initialVotes: Vote[];
 }) {
@@ -104,6 +106,7 @@ export function VotePanel({
         {
           id: result.id ?? crypto.randomUUID(),
           game_code: gameCode,
+          round_id: roundId,
           voter_id: currentUserId,
           target_id: targetId,
           guess: voteKind === "decoy_favorite" ? "favorite" : guesses[targetId],

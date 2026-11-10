@@ -3,6 +3,21 @@ export type ChatStatus = "open" | "locked";
 export type GamePhase = "not_started" | "chat_phase" | "vote_phase" | "final";
 export type VoteStatus = "unlocked" | "pending" | "correct" | "exists" | "none";
 export type VoteKind = "guess" | "decoy_favorite";
+export type RoundStatus = "active" | "finalized";
+
+export type Round = {
+  id: string;
+  game_code: string;
+  round_number: number;
+  status: RoundStatus;
+  finalized_at: string | null;
+};
+
+export type RoundScore = {
+  round_id: string;
+  user_id: string;
+  points: number;
+};
 
 export type Game = {
   game_code: string;
@@ -35,6 +50,7 @@ export type Profile = {
 export type Vote = {
   id: string;
   game_code: string;
+  round_id: string;
   voter_id: string;
   target_id: string;
   guess: string;
