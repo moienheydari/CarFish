@@ -42,6 +42,11 @@ export async function POST(request: Request) {
       { error: parsed.error.issues[0]?.message ?? "Invalid chat." },
       { status: 400 },
     );
+  if (parsed.data.chat_type === "private")
+    return NextResponse.json(
+      { error: "Use the private chat endpoint to create private chats." },
+      { status: 400 },
+    );
   const { data: chat, error } = await supabase
     .from("chats")
     .insert({
