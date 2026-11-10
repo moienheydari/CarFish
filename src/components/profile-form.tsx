@@ -32,6 +32,15 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [createGameOpen, setCreateGameOpen] = useState(false);
   const router = useRouter();
+
+  function getAvatarPath(url: string) {
+    const marker = "/storage/v1/object/public/avatars/";
+    const markerIndex = url.indexOf(marker);
+    if (markerIndex === -1) return null;
+    const path = decodeURIComponent(url.slice(markerIndex + marker.length));
+    return path.startsWith(`${profile?.id ?? ""}/`) ? path : null;
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!joinedGameCode) {
@@ -43,6 +52,9 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
     setError("");
     try {
       let profileImageUrl = values.profile_image_url;
+      let uploadedPath: string | null = null;
+      const previousAvatarPath = getAvatarPath(values.profile_image_url);
+      let supersededImageCleanupFailed = false;
       if (imageFile) {
         const supabase = createClient();
         const {
@@ -61,23 +73,54 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
             upsert: false,
           });
         if (uploadError) throw new Error("Could not upload profile image.");
+        uploadedPath = path;
         profileImageUrl = supabase.storage.from("avatars").getPublicUrl(path)
           .data.publicUrl;
       }
 
-      const response = await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...values,
-          age: values.age === "" ? null : Number(values.age),
-          profile_image_url: profileImageUrl,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Could not save profile.");
+      try {
+        const response = await fetch("/api/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...values,
+            age: values.age === "" ? null : Number(values.age),
+            profile_image_url: profileImageUrl,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? "Could not save profile.");
+      } catch (caughtError) {
+        if (uploadedPath) {
+          const { error: cleanupError } = await createClient()
+            .storage
+            .from("avatars")
+            .remove([uploadedPath]);
+          if (cleanupError)
+            console.error("Could not clean up failed profile image upload.", {
+              path: uploadedPath,
+              message: cleanupError.message,
+            });
+        }
+        throw caughtError;
+      }
 
-      setMessage("Profile saved successfully!");
+      if (uploadedPath && previousAvatarPath && previousAvatarPath !== uploadedPath) {
+        const { error: cleanupError } = await createClient()
+          .storage
+          .from("avatars")
+          .remove([previousAvatarPath]);
+        if (cleanupError) {
+          supersededImageCleanupFailed = true;
+          console.error("Could not remove superseded profile image.", {
+            path: previousAvatarPath,
+            message: cleanupError.message,
+          });
+          setMessage("Profile saved, but the previous image could not be removed.");
+        }
+      }
+
+      if (!supersededImageCleanupFailed) setMessage("Profile saved successfully!");
       await new Promise((resolve) => setTimeout(resolve, 750));
       router.push("/dashboard");
     } catch (caughtError) {
