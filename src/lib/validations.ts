@@ -9,7 +9,7 @@ export const createGameSchema = z.object({
   allow_private_chats: z.boolean(),
   decoy_score: z.number().int().min(0).max(100000),
 });
-export const gamePhaseSchema = z.enum(["not_started", "chat_phase", "vote_phase"]);
+export const gamePhaseSchema = z.enum(["not_started", "chat_phase", "vote_phase", "final"]);
 export const profileSchema = z.object({
   real_name: z.string().trim().max(100, "Real name is too long.").optional().default(""),
   display_name: z

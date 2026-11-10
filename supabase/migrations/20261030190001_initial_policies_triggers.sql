@@ -632,6 +632,29 @@ $$;
 revoke execute on function public.change_game_phase(varchar(4), public.game_phase) from public;
 grant execute on function public.change_game_phase(varchar(4), public.game_phase) to authenticated;
 
+create or replace function public.get_final_guess_counts(
+  p_game_code varchar(4)
+) returns table(target_id uuid, correct_guess_count bigint)
+language sql
+security definer
+set search_path = public
+as $$
+  select v.target_id, count(*)::bigint
+  from public.votes v
+  join public.games g on g.game_code = v.game_code
+  join public.profiles viewer
+    on viewer.id = (select auth.uid())
+   and viewer.game_code = v.game_code
+  where v.game_code = p_game_code
+    and g.phase = 'final'
+    and v.vote_kind = 'guess'
+    and v.status = 'correct'
+  group by v.target_id;
+$$;
+
+revoke execute on function public.get_final_guess_counts(varchar(4)) from public;
+grant execute on function public.get_final_guess_counts(varchar(4)) to authenticated;
+
 do $$
 begin
   if not exists (

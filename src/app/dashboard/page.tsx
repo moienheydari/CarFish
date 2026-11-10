@@ -7,6 +7,7 @@ import { GmChatModal } from "@/components/gm-chat-modal";
 import { PlayerPanel } from "@/components/player-panel";
 import { IntroductionPanel } from "@/components/introduction-panel";
 import { VotePanel } from "@/components/vote-panel";
+import { FinalPanel } from "@/components/final-panel";
 import { GamePhaseSync } from "@/components/game-phase-sync";
 import type { Chat, GamePhase, Profile, Vote } from "@/types/database";
 
@@ -67,6 +68,21 @@ export default async function DashboardPage() {
     .from("votes")
     .select("*")
     .eq("game_code", profile.game_code);
+  const { data: finalGuessCounts } =
+    game?.phase === "final"
+      ? await supabase.rpc("get_final_guess_counts", {
+        p_game_code: profile.game_code,
+      })
+      : { data: null };
+  const correctGuessCounts = Object.fromEntries(
+    (finalGuessCounts ?? []).map((item: {
+      target_id: string;
+      correct_guess_count: number | string;
+    }) => [
+      item.target_id,
+      Number(item.correct_guess_count),
+    ]),
+  );
   const { data: userChats } = await supabase
     .from("chat_members")
     .select("chat_id,user_id");
@@ -134,6 +150,11 @@ export default async function DashboardPage() {
                   <GmChatModal chat={gmChat} currentUserId={user.id} />
                 )}
               </>
+            ) : game?.phase === "final" ? (
+              <FinalPanel
+                players={(players ?? []) as Profile[]}
+                correctGuessCounts={correctGuessCounts}
+              />
             ) : (
               <>
                 <PlayerPanel

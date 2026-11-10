@@ -1,6 +1,6 @@
 export type ChatType = "public" | "private" | "with_gm";
 export type ChatStatus = "open" | "locked";
-export type GamePhase = "not_started" | "chat_phase" | "vote_phase";
+export type GamePhase = "not_started" | "chat_phase" | "vote_phase" | "final";
 export type VoteStatus = "unlocked" | "pending" | "correct" | "exists" | "none";
 export type VoteKind = "guess" | "decoy_favorite";
 

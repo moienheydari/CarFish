@@ -326,6 +326,7 @@ export function GmPanel({
             <option value="not_started">Not started</option>
             <option value="chat_phase">Chat phase</option>
             <option value="vote_phase">Vote phase</option>
+            <option value="final">Final</option>
           </select>
         </label>
         {phaseError && (

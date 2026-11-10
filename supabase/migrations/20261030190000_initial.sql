@@ -18,7 +18,7 @@ drop type if exists public.vote_kind cascade;
 
 create type public.chat_type as enum ('public', 'private', 'with_gm');
 create type public.chat_status as enum ('open', 'locked');
-create type public.game_phase as enum ('not_started', 'chat_phase', 'vote_phase');
+create type public.game_phase as enum ('not_started', 'chat_phase', 'vote_phase', 'final');
 create type public.vote_status as enum ('unlocked', 'pending', 'correct', 'exists', 'none');
 create type public.vote_kind as enum ('guess', 'decoy_favorite');
 
