@@ -29,58 +29,81 @@ export default async function DashboardPage() {
       </main>
     );
 
-  const { data: game } = await supabase
-    .from("games")
-    .select("phase,correct_score,exist_score,allow_private_chats,decoy_favorite_id")
-    .eq("game_code", profile.game_code)
-    .single();
+  const chatColumns =
+    "id,game_code,name,description,created_by,chat_type,status,created_at,updated_at";
+  const profileColumns =
+    "id,real_name,display_name,profile_image_url,job,age,bio,is_gm,is_decoy,score,current_score,game_code,created_at,updated_at";
 
-  let { data: chatRows } = await supabase
-    .from("chats")
-    .select("*")
-    .eq("game_code", profile.game_code)
-    .order("created_at", { ascending: true });
+  const [{ data: game }, { data: initialChatRows }, { data: profiles }, { data: activeRound }, { data: userMemberships }] =
+    await Promise.all([
+      supabase
+        .from("games")
+        .select("phase,correct_score,exist_score,allow_private_chats,decoy_favorite_id")
+        .eq("game_code", profile.game_code)
+        .single(),
+      supabase
+        .from("chats")
+        .select(chatColumns)
+        .eq("game_code", profile.game_code)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select(profileColumns)
+        .eq("game_code", profile.game_code)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("rounds")
+        .select("id,game_code,round_number,status,finalized_at")
+        .eq("game_code", profile.game_code)
+        .eq("status", "active")
+        .maybeSingle(),
+      supabase
+        .from("chat_members")
+        .select("chat_id,user_id")
+        .eq("user_id", user.id),
+    ]);
+  let chatRows = initialChatRows;
 
   // If the user is a GM and there are no public chats, create one
   if (profile.is_gm && !chatRows?.some((chat) => chat.chat_type === "public")) {
-    await supabase.from("chats").insert({
+    const { error: createChatError } = await supabase.from("chats").insert({
       game_code: profile.game_code,
       name: "Public Chat",
       description: "The shared chat for this game (${{ profile.game_code }}).",
       chat_type: "public",
       created_by: user.id,
     });
-    const refreshed = await supabase
+    if (!createChatError) {
+      const refreshed = await supabase
       .from("chats")
-      .select("*")
+      .select(chatColumns)
       .eq("game_code", profile.game_code)
       .order("created_at", { ascending: true });
-    chatRows = refreshed.data;
+      chatRows = refreshed.data;
+    }
   }
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("game_code", profile.game_code)
-    .order("updated_at", { ascending: false });
   const players = (profiles ?? []).filter((item) => !item.is_gm);
-  const { data: activeRound } = await supabase
-    .from("rounds")
-    .select("id")
-    .eq("game_code", profile.game_code)
-    .eq("status", "active")
-    .maybeSingle();
-  const { data: votes } = await supabase
-    .from("votes")
-    .select("*")
-    .eq("game_code", profile.game_code)
-    .eq("round_id", activeRound?.id ?? "");
-  const { data: finalGuessCounts } =
-    game?.phase === "final"
-      ? await supabase.rpc("get_final_guess_counts", {
-        p_game_code: profile.game_code,
-      })
-      : { data: null };
+  const userChatIds = (userMemberships ?? []).map((membership) => membership.chat_id);
+  const [{ data: userChats }, { data: votes }, { data: finalGuessCounts }] =
+    await Promise.all([
+      userChatIds.length
+        ? supabase
+          .from("chat_members")
+          .select("chat_id,user_id")
+          .in("chat_id", userChatIds)
+        : Promise.resolve({ data: [] as { chat_id: string; user_id: string }[] }),
+      supabase
+        .from("votes")
+        .select("id,game_code,round_id,voter_id,target_id,guess,status,vote_kind,created_at,updated_at")
+        .eq("game_code", profile.game_code)
+        .eq("round_id", activeRound?.id ?? ""),
+      game?.phase === "final"
+        ? supabase.rpc("get_final_guess_counts", {
+          p_game_code: profile.game_code,
+        })
+        : Promise.resolve({ data: null }),
+    ]);
   const correctGuessCounts = Object.fromEntries(
     (finalGuessCounts ?? []).map((item: {
       target_id: string;
@@ -90,14 +113,7 @@ export default async function DashboardPage() {
       Number(item.correct_guess_count),
     ]),
   );
-  const { data: userChats } = await supabase
-    .from("chat_members")
-    .select("chat_id,user_id");
-  const userChatsIds = new Set(
-    (userChats ?? [])
-      .filter((item) => item.user_id === user.id)
-      .map((item) => item.chat_id),
-  );
+  const userChatsIds = new Set(userChatIds);
   const chats = (chatRows ?? []).filter(
     (chat) =>
       profile.is_gm ||
