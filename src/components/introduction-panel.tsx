@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Image from "next/image";
 import type { Profile } from "@/types/database";
-import { createClient } from "@/lib/supabase/browser";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 function sortPlayers(players: Profile[]) {
   return [...players].sort(
@@ -24,21 +25,9 @@ export function IntroductionPanel({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const player = players[selectedIndex] ?? null;
 
-  useEffect(() => {
-    const supabase = createClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let active = true;
-
-    async function subscribe() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!active || !session) return;
-
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`profiles-${gameCode}-${crypto.randomUUID()}`)
-        .on(
+  const configure = useCallback(
+    (channel: RealtimeChannel) =>
+      channel.on(
           "postgres_changes",
           {
             event: "*",
@@ -47,8 +36,6 @@ export function IntroductionPanel({
             filter: `game_code=eq.${gameCode}`,
           },
           (payload) => {
-            if (!active) return;
-
             if (payload.eventType === "DELETE") {
               const deletedId = String(payload.old.id ?? "");
               setPlayers((current) =>
@@ -65,16 +52,10 @@ export function IntroductionPanel({
               return incoming.is_gm ? next : sortPlayers([...next, incoming]);
             });
           },
-        )
-        .subscribe();
-    }
-
-    void subscribe();
-    return () => {
-      active = false;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [gameCode]);
+        ),
+    [gameCode],
+  );
+  useRealtimeChannel(`profiles-${gameCode}`, configure);
 
   if (!player)
     return (
