@@ -1,40 +1,55 @@
-Website : https://car-fish.vercel.app/
+# CarFish
 
-For Development : https://supabase.com/dashboard/project/xnzwlzgpkrvfvmkqpqhk/auth/url-configuration
+CarFish is a real-time social deduction game inspired by [GameChanger](https://www.youtube.com/@GameChangerShow). Create or join a game, meet the other players, chat in the arena, and use the round-based voting system to identify the decoy.
 
+## Play online
 
-# ChatArena
+**[Open CarFish](https://car-fish.vercel.app/)**
 
-ChatArena is a Next.js App Router MVP for real-time game chats. It uses Supabase Auth, PostgreSQL, RLS, and Realtime. Chats are public or private, belong to a four-character game code, and can be open or locked.
+## What you can do
 
-## Local setup
+- Create and join games with a short game code
+- Set up a player profile with a display name, job, age, bio, and profile image
+- Chat in public rooms, private player chats, and a dedicated game-master chat
+- Play through game phases managed by the game master
+- Vote during active rounds and review final results
+- Get real-time updates across chats, game state, rounds, and votes
 
-1. Create a Supabase project and copy `.env.example` to `.env.local`.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-3. Run `supabase/migrations/20261030190000_initial.sql` in the Supabase SQL editor (or with the Supabase CLI).
-4. Enable Google under Supabase **Authentication > Providers > Google**. Create a Google OAuth web client and add the Supabase callback URL shown by the provider settings. Add `http://localhost:3000/auth/callback` and the production callback URL to the Supabase URL configuration.
-5. Install and run:
+## Tech stack
+
+- [Next.js](https://nextjs.org/) App Router
+- [React](https://react.dev/) and TypeScript
+- [Supabase](https://supabase.com/) Auth, PostgreSQL, Row Level Security, and Realtime
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Vercel](https://vercel.com/) deployment
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 20 or newer
+- A Supabase project
+- Google OAuth credentials if Google sign-in is enabled
+
+### Installation
 
 ```bash
+git clone https://github.com/moienheydari/CarFish.git
+cd CarFish
 npm install
-npm run dev
 ```
 
-## Architecture
+Create a `.env.local` file in the project root:
 
-- Server Components load protected pages and use the cookie-backed Supabase SSR client.
-- `proxy.ts` refreshes auth cookies on requests. Route handlers under `src/app/api` authenticate and validate every mutation.
-- PostgreSQL constraints and RLS enforce ownership, membership, message length, and host-only state transitions.
-- `ChatClient` subscribes only to the active chat's `messages` and `chats` Postgres Changes channels. Message history starts at 50 rows and can be extended with cursor pagination.
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
 
-## Deployment
+Apply the migrations in [`supabase/migrations`](./supabase/migrations) using the Supabase CLI or the Supabase SQL editor. If you use Google sign-in, configure the provider and add your local callback URL (`http://localhost:3000/auth/callback`) to Supabase's redirect allow-list.
 
-Deploy the repository to Vercel, add the three environment variables from `.env.example`, and set the Supabase URL configuration `SITE_URL`/redirect allow-list to the Vercel domain. Do not add a service-role key to Vercel for this MVP.
+Start the development server:
 
-## Verification
-
-Run `npm run lint`, `npx tsc --noEmit`, and `npm run build`. Cloud authentication, RLS, and cross-browser Realtime behavior require configured Supabase credentials and should be manually verified with two accounts.
-
-## Known limitations
-
-The MVP has no scoring, voting, rounds, uploads, or exact online presence. Private chats are limited to two members by a database trigger.
+```bash
+npm run dev
+```
