@@ -180,18 +180,22 @@ export function ChatBox({
       return;
     setBusy(true);
     setError("");
-    const response = await fetch(`/api/chats/${chat.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    const result = await response.json();
-    if (response.ok) {
+    try {
+      const response = await fetch(`/api/chats/${chat.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not send message.");
       setMessages((old) => mergeMessages(old, [result as Message]));
       setContent("");
       window.requestAnimationFrame(() => inputRef.current?.focus());
-    } else setError(result.error ?? "Could not send message.");
-    setBusy(false);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not send message.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function updateMentionContext(value: string, cursor: number) {
@@ -250,15 +254,20 @@ export function ChatBox({
     setBusy(true);
     setError("");
     const nextStatus = status === "open" ? "locked" : "open";
-    const response = await fetch(`/api/chats/${chat.id}/state`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: nextStatus }),
-    });
-    const result = await response.json();
-    if (response.ok) setStatus(result.status);
-    else setError(result.error ?? "Could not change chat status.");
-    setBusy(false);
+    try {
+      const response = await fetch(`/api/chats/${chat.id}/state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not change chat status.");
+      setStatus(result.status);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not change chat status.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (!chat)

@@ -24,68 +24,60 @@ export function LoginButton({
     event.preventDefault();
     setBusy(true);
     setError("");
-    const supabase = createClient();
-    const { next } = await searchParams;
-    const requestedDestination = next?.startsWith("/") ? next : "/dashboard";
-    const result =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-          email,
-          password,
-        });
-    const authError = result.error;
-    if (authError) {
-      setError(authError.message);
-      setBusy(false);
-      return;
-    }
+    try {
+      const supabase = createClient();
+      const { next } = await searchParams;
+      const requestedDestination = next?.startsWith("/") ? next : "/dashboard";
+      const result =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({
+            email,
+            password,
+          });
+      if (result.error) throw new Error(result.error.message);
+      if (!result.data.user || !result.data.session)
+        throw new Error("Account created, but no active session was returned. Try signing in.");
 
-    if (!result.data.user || !result.data.session) {
-      setError("Account created, but no active session was returned. Try signing in.");
-      setBusy(false);
-      return;
-    }
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert(
+          { id: result.data.user.id },
+          { onConflict: "id", ignoreDuplicates: true },
+        );
+      if (profileError) throw new Error(profileError.message);
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .upsert(
-        { id: result.data.user.id },
-        { onConflict: "id", ignoreDuplicates: true },
-      );
-    if (profileError) {
-      setError(profileError.message);
-      setBusy(false);
-      return;
-    }
+      const { data: profile, error: profileReadError } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", result.data.user.id)
+        .maybeSingle();
+      if (profileReadError) throw new Error(profileReadError.message);
 
-    const { data: profile, error: profileReadError } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", result.data.user.id)
-      .maybeSingle();
-    if (profileReadError) {
-      setError(profileReadError.message);
+      router.push(profile?.display_name ? requestedDestination : "/profile");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not sign in.");
+    } finally {
       setBusy(false);
-      return;
     }
-
-    router.push(profile?.display_name ? requestedDestination : "/profile");
   }
 
   async function loginWithGoogle() {
     setBusy(true);
     setError("");
-    const next = (await searchParams).next;
-    const origin = window.location.origin;
-    const { error: authError } = await createClient().auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next?.startsWith("/") ? next : "/dashboard")}`,
-      },
-    });
-    if (authError) {
-      setError(authError.message);
+    try {
+      const next = (await searchParams).next;
+      const origin = window.location.origin;
+      const { error: authError } = await createClient().auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next?.startsWith("/") ? next : "/dashboard")}`,
+        },
+      });
+      if (authError) throw new Error(authError.message);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not sign in with Google.");
+    } finally {
       setBusy(false);
     }
   }

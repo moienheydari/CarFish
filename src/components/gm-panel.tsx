@@ -133,33 +133,37 @@ export function GmPanel({
   async function changePhase(nextPhase: GamePhase) {
     setPhaseBusy(true);
     setPhaseError("");
-    const response = await fetch(`/api/games/${gameCode}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phase: nextPhase }),
-    });
-    const result = await response.json();
-    if (response.ok) {
+    try {
+      const response = await fetch(`/api/games/${gameCode}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: nextPhase }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not update game phase.");
       setPhase(result.phase as GamePhase);
+    } catch (caughtError) {
+      setPhaseError(caughtError instanceof Error ? caughtError.message : "Could not update game phase.");
+    } finally {
+      setPhaseBusy(false);
     }
-    else setPhaseError(result.error ?? "Could not update game phase.");
-    setPhaseBusy(false);
   }
 
   async function togglePrivateChats() {
     const nextValue = !allowPrivateChats;
     setPhaseError("");
-    const response = await fetch(`/api/games/${gameCode}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allow_private_chats: nextValue }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setPhaseError(result.error ?? "Could not update private chat settings.");
-      return;
+    try {
+      const response = await fetch(`/api/games/${gameCode}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allow_private_chats: nextValue }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not update private chat settings.");
+      setAllowPrivateChats(nextValue);
+    } catch (caughtError) {
+      setPhaseError(caughtError instanceof Error ? caughtError.message : "Could not update private chat settings.");
     }
-    setAllowPrivateChats(nextValue);
   }
 
   const allGameChatsOpen =
@@ -169,46 +173,45 @@ export function GmPanel({
     const nextStatus = allGameChatsOpen ? "locked" : "open";
     setChatStatusBusy(true);
     setPhaseError("");
-    const response = await fetch("/api/chats/state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ game_code: gameCode, status: nextStatus }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setPhaseError(result.error ?? "Could not update game chat states.");
+    try {
+      const response = await fetch("/api/chats/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_code: gameCode, status: nextStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not update game chat states.");
+      setGameChatsState((current) =>
+        current.map((chat) =>
+          chat.chat_type === "with_gm" ? chat : { ...chat, status: nextStatus },
+        ),
+      );
+      if (nextStatus === "locked" && allowPrivateChats) await togglePrivateChats();
+    } catch (caughtError) {
+      setPhaseError(caughtError instanceof Error ? caughtError.message : "Could not update game chat states.");
+    } finally {
       setChatStatusBusy(false);
-      return;
     }
-    setGameChatsState((current) =>
-      current.map((chat) =>
-        chat.chat_type === "with_gm" ? chat : { ...chat, status: nextStatus },
-      ),
-    );
-    if (nextStatus === "locked" && allowPrivateChats) {
-      await togglePrivateChats();
-    }
-    setChatStatusBusy(false);
   }
 
   async function reviewVote(voteId: string, status: VoteStatus) {
     setReviewError("");
-    const response = await fetch(`/api/games/${gameCode}/votes`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vote_id: voteId, status }),
-    });
-    if (!response.ok) {
+    try {
+      const response = await fetch(`/api/games/${gameCode}/votes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vote_id: voteId, status }),
+      });
       const result = await response.json();
-      setReviewError(result.error ?? "Could not update vote.");
-      return;
-    }
-
-    setReviewedVotes((current) =>
-      current.map((vote) => vote.id === voteId ? { ...vote, status } : vote),
-    );
-    if (status === "unlocked") {
-      setHiddenVoteIds((current) => new Set(current).add(voteId));
+      if (!response.ok) throw new Error(result.error ?? "Could not update vote.");
+      setReviewedVotes((current) =>
+        current.map((vote) => vote.id === voteId ? { ...vote, status } : vote),
+      );
+      if (status === "unlocked") {
+        setHiddenVoteIds((current) => new Set(current).add(voteId));
+      }
+    } catch (caughtError) {
+      setReviewError(caughtError instanceof Error ? caughtError.message : "Could not update vote.");
     }
   }
 

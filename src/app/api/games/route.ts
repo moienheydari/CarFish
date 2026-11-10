@@ -34,18 +34,17 @@ export async function POST(request: Request) {
       { status: 409 },
     );
 
-  const { data: game, error } = await supabase
-    .from("games")
-    .insert({
-      game_code: gameCode,
-      has_decoy: parsed.data.has_decoy,
-      correct_score: parsed.data.correct_score,
-      exist_score: parsed.data.exist_score,
-      allow_private_chats: parsed.data.allow_private_chats,
-      decoy_score: parsed.data.decoy_score,
-    })
-    .select("game_code,phase,has_decoy,correct_score,exist_score,allow_private_chats,decoy_score,decoy_favorite_id")
-    .maybeSingle();
+  const { data: game, error } = await supabase.rpc(
+    "create_game_with_public_chat",
+    {
+      p_game_code: gameCode,
+      p_has_decoy: parsed.data.has_decoy,
+      p_correct_score: parsed.data.correct_score,
+      p_exist_score: parsed.data.exist_score,
+      p_allow_private_chats: parsed.data.allow_private_chats,
+      p_decoy_score: parsed.data.decoy_score,
+    },
+  );
   if (!error && game) return NextResponse.json(game, { status: 201 });
   if (error) {
     console.error("Could not create game.", {
@@ -55,7 +54,7 @@ export async function POST(request: Request) {
       hint: error.hint,
     });
   }
-  if (error?.code === "42703")
+  if (error?.code === "42703" || error?.code === "42883")
     return NextResponse.json(
       { error: "The database is missing the latest game settings columns. Apply the current Supabase migrations." },
       { status: 500 },

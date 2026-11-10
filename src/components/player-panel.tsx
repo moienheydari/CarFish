@@ -176,13 +176,14 @@ export function PlayerPanel({
     if (!allowPrivateChats) return;
     setBusyPlayerId(player.id);
     setError("");
-    const response = await fetch("/api/chats/private", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient_id: player.id, game_code: gameCode }),
-    });
-    const result = await response.json();
-    if (response.ok) {
+    try {
+      const response = await fetch("/api/chats/private", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient_id: player.id, game_code: gameCode }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not open private chat.");
       setChats((old) => [
         ...old.filter((chat) => chat.id !== result.id),
         result as Chat,
@@ -193,8 +194,11 @@ export function PlayerPanel({
         { chat_id: result.id, user_id: player.id },
       ]);
       setSelectedChatId(result.id);
-    } else setError(result.error ?? "Could not open private chat.");
-    setBusyPlayerId("");
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Could not open private chat.");
+    } finally {
+      setBusyPlayerId("");
+    }
   }
 
   function hasPrivateChat(playerId: string) {

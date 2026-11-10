@@ -62,26 +62,7 @@ export default async function DashboardPage() {
         .select("chat_id,user_id")
         .eq("user_id", user.id),
     ]);
-  let chatRows = initialChatRows;
-
-  // If the user is a GM and there are no public chats, create one
-  if (profile.is_gm && !chatRows?.some((chat) => chat.chat_type === "public")) {
-    const { error: createChatError } = await supabase.from("chats").insert({
-      game_code: profile.game_code,
-      name: "Public Chat",
-      description: "The shared chat for this game (${{ profile.game_code }}).",
-      chat_type: "public",
-      created_by: user.id,
-    });
-    if (!createChatError) {
-      const refreshed = await supabase
-      .from("chats")
-      .select(chatColumns)
-      .eq("game_code", profile.game_code)
-      .order("created_at", { ascending: true });
-      chatRows = refreshed.data;
-    }
-  }
+  const chatRows = initialChatRows;
 
   const players = (profiles ?? []).filter((item) => !item.is_gm);
   const userChatIds = (userMemberships ?? []).map((membership) => membership.chat_id);
