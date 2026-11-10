@@ -207,7 +207,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   return (
     <form onSubmit={submit} className="space-y-5">
       <label className="block text-sm font-medium">
-        Real name
+        Real name (not shown publicly)
         <input
           value={values.real_name}
           onChange={(e) => setValues({ ...values, real_name: e.target.value })}

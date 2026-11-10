@@ -117,6 +117,15 @@ export function GmPanel({
     if (status === "SUBSCRIBED") void reconcileVotes();
   });
   const unreadCounts = useUnreadChatCounts(gameChatsState, currentUserId);
+  const sortedGameChats = [...gameChats].sort((left, right) => {
+    const leftIsPublic = left.chat_type === "public";
+    const rightIsPublic = right.chat_type === "public";
+    if (leftIsPublic !== rightIsPublic) return leftIsPublic ? -1 : 1;
+    return (unreadCounts[right.id] ?? 0) - (unreadCounts[left.id] ?? 0);
+  });
+  const sortedGmChats = [...gmChats].sort(
+    (left, right) => (unreadCounts[right.id] ?? 0) - (unreadCounts[left.id] ?? 0),
+  );
   const visibleVotes = reviewedVotes
     .filter((vote) => !hiddenVoteIds.has(vote.id))
     .sort((left, right) => {
@@ -220,54 +229,50 @@ export function GmPanel({
   }
 
   return (
-    <section className="mt-2">
-      <div className="mb-5">
-        <p className="text-sm text-[var(--accent)]">Game master panel</p>
-        <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>
-      </div>
-      <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-        <div className="flex items-center justify-between gap-3">
+    <section className="mt-1">
+      <div className="mb-1 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+        <div className="flex items-center justify-between gap-1">
           <h3 className="font-semibold">Vote review</h3>
           {visibleVotes.length > 0 && (
             <button
               type="button"
               onClick={clearDisplayedVotes}
-              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+              className="cursor-pointer rounded-xl border border-[var(--line)] px-2.5 py-1.5 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
             >
               Clear displayed votes
             </button>
           )}
         </div>
-        <div className="mt-3 max-h-[20rem] space-y-2 overflow-y-auto pr-1">
+        <div className="mt-2 max-h-[20rem] space-y-0.5 overflow-y-auto pr-1">
           {visibleVotes.map((vote) => {
             const voter = players.find((player) => player.id === vote.voter_id);
             const target = players.find((player) => player.id === vote.target_id);
             const isDecoyFavorite = vote.vote_kind === "decoy_favorite";
             return (
-              <div key={vote.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--line)] p-3 text-sm">
+              <div key={vote.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] p-2 text-sm">
                 <span className="font-medium">{voter?.display_name ?? "Unknown"}</span>
                 <span className="font-medium">({voter?.real_name ?? "Unknown"})</span>
                 <span className="text-[var(--muted)]">guessed</span>
                 <span className="font-medium">{target?.display_name ?? "Unknown"}</span>
                 <span className="font-medium">({target?.real_name ?? "Unknown"})</span>
                 <span className="text-[var(--muted)]">as {vote.guess}</span>
-                <span className="ml-auto rounded-full border border-[var(--line)] px-2 py-1 text-xs">
+                <span className="ml-auto rounded-full border border-[var(--line)] px-2 py-0.5 text-xs">
                   {vote.status}
                 </span>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   {vote.status === "pending" && (
                     <>
-                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="cursor-pointer rounded-lg bg-emerald-700 px-2 py-1 text-xs transition hover:bg-emerald-600">Correct</button>
+                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="cursor-pointer rounded-lg bg-emerald-700 px-2 py-0.5 text-xs transition hover:bg-emerald-600">Correct</button>
                       {!isDecoyFavorite && (
                         <>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="cursor-pointer rounded-lg bg-amber-700 px-2 py-1 text-xs transition hover:bg-amber-600">Exists</button>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-1 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">None</button>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="cursor-pointer rounded-lg bg-amber-700 px-2 py-0.5 text-xs transition hover:bg-amber-600">Exists</button>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">None</button>
                         </>
                       )}
                     </>
                   )}
                   {vote.status !== "unlocked" && (
-                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-1 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">Unlock</button>
+                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">Unlock</button>
                   )}
                 </div>
               </div>
@@ -277,80 +282,72 @@ export function GmPanel({
         </div>
         {reviewError && <p role="alert" className="mt-2 text-sm text-rose-300">{reviewError}</p>}
       </div>
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-        <div>
-          <h3 className="font-semibold">Private player chats</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Players can always see existing chats, but this controls whether they can create new ones.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void togglePrivateChats()}
-          className={`cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition hover:brightness-110 ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)] hover:bg-[#2a0a0a]"}`}
-        >
-          {allowPrivateChats ? "Enabled" : "Disabled"}
-        </button>
-      </div>
-      <div className="mb-5 flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-        <div>
-          <h3 className="font-semibold">Game chats</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Open or close all public and private chats. Player conversations with the GM are not affected.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void toggleAllGameChats()}
-          disabled={chatStatusBusy || !gameChats.length}
-          className="cursor-pointer rounded-xl border border-[var(--accent)] px-3 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {allGameChatsOpen ? "Close all chats" : "Open all chats"}
-        </button>
-      </div>
-      <div className="mb-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-        <label className="flex items-center justify-between gap-3 text-sm font-semibold">
-          Game phase
-          <select
-            value={phase}
-            onChange={(event) => void changePhase(event.target.value as GamePhase)}
-            disabled={phaseBusy}
-            className="rounded-lg border border-[var(--line)] bg-[#050505] px-3 py-2 text-sm font-normal outline-none focus:border-[var(--accent)]"
+      <div className="mb-1 grid gap-1 lg:grid-cols-3">
+        <div className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <h3 className="font-semibold">Private Chat Creation</h3>
+          <button
+            type="button"
+            onClick={() => void togglePrivateChats()}
+            className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-sm font-semibold transition hover:brightness-110 ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)] hover:bg-[#2a0a0a]"}`}
           >
-            <option value="not_started">Not started</option>
-            <option value="chat_phase">Chat phase</option>
-            <option value="vote_phase">Vote phase</option>
-            <option value="final">Final</option>
-          </select>
-        </label>
-        {phaseError && (
-          <p role="alert" className="mt-2 text-sm text-rose-300">
-            {phaseError}
-          </p>
-        )}
+            {allowPrivateChats ? "Enabled" : "Disabled"}
+          </button>
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <h3 className="font-semibold">Chats</h3>
+          <button
+            type="button"
+            onClick={() => void toggleAllGameChats()}
+            disabled={chatStatusBusy || !gameChats.length}
+            className="cursor-pointer rounded-xl border border-[var(--accent)] px-2.5 py-1.5 text-sm font-semibold text-[var(--accent)] transition hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {allGameChatsOpen ? "Close all chats" : "Open all chats"}
+          </button>
+        </div>
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <label className="flex items-center justify-between gap-3 text-m font-semibold">
+            Game Phase
+            <select
+              value={phase}
+              onChange={(event) => void changePhase(event.target.value as GamePhase)}
+              disabled={phaseBusy}
+              className="rounded-lg border border-[var(--line)] bg-[#050505] px-2 py-1.5 text-sm font-normal outline-none focus:border-[var(--accent)]"
+            >
+              <option value="not_started">Not started</option>
+              <option value="chat_phase">Chat phase</option>
+              <option value="vote_phase">Vote phase</option>
+              <option value="final">Final</option>
+            </select>
+          </label>
+          {phaseError && (
+            <p role="alert" className="mt-2 text-sm text-rose-300">
+              {phaseError}
+            </p>
+          )}
+        </div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-[220px_1fr_260px]">
-        <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+      <div className="grid gap-1 lg:grid-cols-[200px_1fr_280px_180px]">
+        <aside className="flex h-[80vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <div className="mb-2 flex shrink-0 items-center gap-2 text-sm font-semibold">
             <Users size={16} /> Players ({players.length})
           </div>
-          <div className="space-y-2">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
             {players.map((player) => (
-              <div key={player.id} className="flex items-center gap-3 rounded-xl p-2">
+              <div key={player.id} className="flex items-center gap-2 rounded-xl p-1.5">
                 <Avatar profile={player} />
                 <div className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
                     {player.display_name || "Unnamed player"}
                   </span>
                   <span className="block truncate text-xs text-[var(--muted)]">
-                    Real name: {player.real_name || "Not provided"}
+                    Real: {player.real_name || "Not provided"}
                   </span>
                   {player.is_decoy ? (
-                    <span className="mt-1 block text-xs font-semibold text-[var(--accent)]">
+                    <span className="mt-0.5 block text-xs font-semibold text-[var(--accent)]">
                       Decoy
                     </span>
                   ) : (
-                    <div className="mt-1 flex gap-3 text-xs">
+                    <div className="mt-0.5 flex gap-2 text-xs">
                       <span>Total: {player.score}</span>
                       <span className="text-[var(--accent)]">
                         Current: {player.current_score}
@@ -374,53 +371,51 @@ export function GmPanel({
           mentionableProfiles={mentionableProfiles}
           canSendWhenClosed
         />
-        <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <aside className="flex h-[80vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <div className="mb-2 flex shrink-0 items-center gap-2 text-sm font-semibold">
             <MessageCircle size={16} /> Game chats
           </div>
-          <div className="space-y-2">
-            {gameChats.map((chat) => (
-              <button
-                key={chat.id}
-                type="button"
-                onClick={() => selectChat(chat.id)}
-                className={`relative w-full rounded-xl border px-3 py-3 pr-10 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
-              >
-                <span className="block font-medium">{chat.name}</span>
-                <span className="text-xs text-[var(--muted)]">
-                  {chat.chat_type} · {chat.status}
-                </span>
-                {unreadCounts[chat.id] > 0 && (
-                  <UnreadBadge count={unreadCounts[chat.id]} />
-                )}
-              </button>
-            ))}
-            {!gameChats.length && (
-              <p className="text-sm text-[var(--muted)]">No chats yet.</p>
-            )}
-          </div>
-          <div className="mt-6 border-t border-[var(--line)] pt-4">
-            <div className="mb-3 text-sm font-semibold text-[var(--accent)]">
-              Game master conversations
-            </div>
-            <div className="space-y-2">
-              {gmChats.map((chat) => (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-1">
+              {sortedGameChats.map((chat) => (
                 <button
                   key={chat.id}
                   type="button"
                   onClick={() => selectChat(chat.id)}
-                  className={`relative w-full rounded-xl border px-3 py-3 pr-10 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                  className={`relative w-full rounded-xl border px-2.5 py-2 pr-8 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
                 >
-                  <span className="block font-medium">{chat.name}</span>
-                  <span className="text-xs text-[var(--muted)]">
-                    Player conversation · {chat.status}
-                  </span>
+                  <span className="block text-sm">{chat.name}<span className="text-xs text-[var(--muted)]"> ({chat.status})</span></span>
                   {unreadCounts[chat.id] > 0 && (
                     <UnreadBadge count={unreadCounts[chat.id]} />
                   )}
                 </button>
               ))}
-              {!gmChats.length && (
+              {!sortedGameChats.length && (
+                <p className="text-sm text-[var(--muted)]">No chats yet.</p>
+              )}
+            </div>
+          </div>
+        </aside>
+        <aside className="flex h-[80vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <div className="mb-2 flex shrink-0 items-center gap-2 text-sm font-semibold">
+            <MessageCircle size={16} /> GM chats
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-1">
+              {sortedGmChats.map((chat) => (
+                <button
+                  key={chat.id}
+                  type="button"
+                  onClick={() => selectChat(chat.id)}
+                  className={`relative w-full rounded-xl border px-2.5 py-2 pr-8 text-left text-sm ${chat.id === selectedChatId ? "border-[var(--accent)] bg-[#2a0a0a]" : "border-transparent hover:border-[var(--line)]"}`}
+                >
+                  <span className="block text-sm">{chat.name.replace(/\s*&\s*GM\s*$/, "")}</span>
+                  {unreadCounts[chat.id] > 0 && (
+                    <UnreadBadge count={unreadCounts[chat.id]} />
+                  )}
+                </button>
+              ))}
+              {!sortedGmChats.length && (
                 <p className="text-sm text-[var(--muted)]">
                   No player GM chats yet.
                 </p>

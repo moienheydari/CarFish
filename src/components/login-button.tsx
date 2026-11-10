@@ -126,7 +126,7 @@ export function LoginButton({
           setError("");
         }}
         disabled={busy}
-        className={`mt-4 w-full cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50 ${mode === "login"
+        className={`mt-4 w-full cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${mode === "login"
           ? "border-[var(--line)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           : "border-[var(--line)] text-[var(--muted)] hover:border-[#2f00ff] hover:text-[#2f00ff]"
           }`}

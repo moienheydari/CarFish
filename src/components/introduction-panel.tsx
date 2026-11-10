@@ -28,31 +28,31 @@ export function IntroductionPanel({
   const configure = useCallback(
     (channel: RealtimeChannel) =>
       channel.on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "profiles",
-            filter: `game_code=eq.${gameCode}`,
-          },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              const deletedId = String(payload.old.id ?? "");
-              setPlayers((current) =>
-                current.filter((currentPlayer) => currentPlayer.id !== deletedId),
-              );
-              return;
-            }
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `game_code=eq.${gameCode}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = String(payload.old.id ?? "");
+            setPlayers((current) =>
+              current.filter((currentPlayer) => currentPlayer.id !== deletedId),
+            );
+            return;
+          }
 
-            const incoming = payload.new as Profile;
-            setPlayers((current) => {
-              const next = current.filter(
-                (currentPlayer) => currentPlayer.id !== incoming.id,
-              );
-              return incoming.is_gm ? next : sortPlayers([...next, incoming]);
-            });
-          },
-        ),
+          const incoming = payload.new as Profile;
+          setPlayers((current) => {
+            const next = current.filter(
+              (currentPlayer) => currentPlayer.id !== incoming.id,
+            );
+            return incoming.is_gm ? next : sortPlayers([...next, incoming]);
+          });
+        },
+      ),
     [gameCode],
   );
   useRealtimeChannel(`profiles-${gameCode}`, configure);
@@ -70,7 +70,7 @@ export function IntroductionPanel({
 
   return (
     <section className="mx-auto mt-10 max-w-2xl rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-6">
-      <p className="text-sm text-[var(--accent)]">Meet the players</p>
+      <p className="text-lg text-[var(--accent)]">Meet the players</p>
       <div className="mt-5 flex items-center justify-between gap-4">
         <button
           type="button"
@@ -88,14 +88,14 @@ export function IntroductionPanel({
               width={128}
               height={128}
               unoptimized
-              className="mx-auto h-32 w-32 rounded-full object-cover"
+              className="mx-auto h-45 w-45 rounded-full object-cover"
             />
           ) : (
-            <div className="mx-auto grid h-32 w-32 place-items-center rounded-full bg-[#2a0a0a] text-4xl font-semibold text-[var(--accent)]">
+            <div className="mx-auto grid h-45 w-45 place-items-center rounded-full bg-[#2a0a0a] text-4xl font-semibold text-[var(--accent)]">
               {(player.display_name || "?").slice(0, 1).toUpperCase()}
             </div>
           )}
-          <h2 className="mt-4 text-2xl font-semibold">
+          <h2 className="mt-4 text-3xl font-semibold">
             {player.display_name || "Unnamed player"}
           </h2>
           <div className="mt-4 grid gap-3 text-left sm:grid-cols-2">
