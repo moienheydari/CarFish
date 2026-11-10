@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { MessageCircle, UserRound } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
@@ -11,6 +11,8 @@ import {
 } from "@/hooks/use-unread-chat-counts";
 import type { Chat, Profile } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export function PlayerPanel({
   players,
@@ -42,31 +44,127 @@ export function PlayerPanel({
   const selectedChat = chats.find((chat) => chat.id === selectedChatId) ?? null;
   const unreadCounts = useUnreadChatCounts(chats, currentUserId);
 
-  useEffect(() => {
+  const reconcileChats = useCallback(async () => {
     const supabase = createClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let active = true;
-    async function subscribe() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!active || !session) return;
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`player-game-settings-${gameCode}-${crypto.randomUUID()}`)
+    const [{ data: memberships }, { data: publicChats }] = await Promise.all([
+      supabase
+        .from("chat_members")
+        .select("chat_id,user_id")
+        .eq("user_id", currentUserId),
+      supabase
+        .from("chats")
+        .select("*")
+        .eq("game_code", gameCode)
+        .eq("chat_type", "public"),
+    ]);
+    const memberRows = memberships ?? [];
+    const chatIds = memberRows.map((membership) => membership.chat_id);
+    const { data: memberChats } = chatIds.length
+      ? await supabase.from("chats").select("*").in("id", chatIds).eq("game_code", gameCode)
+      : { data: [] };
+    setChatMembers((current) => [
+      ...current.filter((membership) => membership.user_id !== currentUserId),
+      ...memberRows,
+    ]);
+    setChats([
+      ...(publicChats ?? []),
+      ...(memberChats ?? []).filter((chat) => chat.chat_type !== "public"),
+    ] as Chat[]);
+  }, [currentUserId, gameCode]);
+  const configure = useCallback(
+    (channel: RealtimeChannel) =>
+      channel
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "games", filter: `game_code=eq.${gameCode}` },
           (payload) => {
-            if (active) setAllowPrivateChats(Boolean(payload.new.allow_private_chats));
+            setAllowPrivateChats(Boolean(payload.new.allow_private_chats));
           },
         )
-        .subscribe();
-    }
-    void subscribe();
-    return () => {
-      active = false;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [gameCode]);
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "chats",
+            filter: `game_code=eq.${gameCode}`,
+          },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              const deletedId = String(payload.old.id ?? "");
+              setChats((current) => current.filter((chat) => chat.id !== deletedId));
+              return;
+            }
+            const incoming = payload.new as Chat;
+            setChats((current) => [
+              ...current.filter((chat) => chat.id !== incoming.id),
+              incoming,
+            ]);
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_members",
+            filter: `user_id=eq.${currentUserId}`,
+          },
+          async (payload) => {
+            const membership = payload.new as { chat_id: string; user_id: string };
+            const { data: incoming } = await createClient()
+              .from("chats")
+              .select("*")
+              .eq("id", membership.chat_id)
+              .eq("game_code", gameCode)
+              .maybeSingle();
+            if (incoming) {
+              setChats((current) => [
+                ...current.filter((chat) => chat.id !== incoming.id),
+                incoming as Chat,
+              ]);
+              setChatMembers((current) => [
+                ...current.filter(
+                  (member) =>
+                    !(
+                      member.chat_id === membership.chat_id &&
+                      member.user_id === membership.user_id
+                    ),
+                ),
+                membership,
+              ]);
+            }
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "chat_members",
+            filter: `user_id=eq.${currentUserId}`,
+          },
+          (payload) => {
+            const membership = payload.old as { chat_id: string; user_id: string };
+            setChatMembers((current) =>
+              current.filter(
+                (member) =>
+                  !(
+                    member.chat_id === membership.chat_id &&
+                    member.user_id === membership.user_id
+                  ),
+              ),
+            );
+            setChats((current) =>
+              current.filter((chat) => chat.id !== membership.chat_id),
+            );
+          },
+        ),
+    [currentUserId, gameCode],
+  );
+  useRealtimeChannel(`player-game-${gameCode}-${currentUserId}`, configure, (status) => {
+    if (status === "SUBSCRIBED") void reconcileChats();
+  });
 
   function selectChat(chatId: string) {
     markChatRead(currentUserId, chatId);

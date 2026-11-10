@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
-import {
-  markChatRead,
-  MESSAGE_EVENT,
-} from "@/hooks/use-unread-chat-counts";
+import { markChatRead } from "@/hooks/use-unread-chat-counts";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Chat, Message, Profile } from "@/types/database";
 
 export function ChatBox({
@@ -47,28 +46,7 @@ export function ChatBox({
     inputRef.current?.focus();
   }, [chatId, canSend, status]);
 
-  useEffect(() => {
-    if (!chat) return;
-
-    const activeChat = chat;
-    markChatRead(currentUserId, activeChat.id);
-    let active = true;
-    const supabase = createClient();
-    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let connecting = false;
-
-    async function loadStatus() {
-      const response = await fetch(`/api/chats/${activeChat.id}/state`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to load chat status.");
-      if (active) setStatus(result.status as Chat["status"]);
-    }
-
-    function mergeMessages(
-      existing: Message[],
-      incoming: Message[],
-    ): Message[] {
+  const mergeMessages = useCallback((existing: Message[], incoming: Message[]) => {
       const byId = new Map(existing.map((message) => [message.id, message]));
       incoming.forEach((message) => byId.set(message.id, message));
       return [...byId.values()].sort(
@@ -76,76 +54,53 @@ export function ChatBox({
           new Date(left.created_at).getTime() -
           new Date(right.created_at).getTime(),
       );
-    }
+  }, []);
 
-    async function loadHistory() {
-      const response = await fetch(`/api/chats/${activeChat.id}/messages`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Unable to load messages.");
-      if (active) setMessages((old) => mergeMessages(old, result as Message[]));
-    }
+  const loadStatus = useCallback(async () => {
+    if (!chatId) return;
+    const response = await fetch(`/api/chats/${chatId}/state`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "Unable to load chat status.");
+    setStatus(result.status as Chat["status"]);
+  }, [chatId]);
 
-    async function loadMessage(messageId: string) {
-      const { data } = await supabase
+  const loadHistory = useCallback(async () => {
+    if (!chatId) return;
+    const response = await fetch(`/api/chats/${chatId}/messages`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "Unable to load messages.");
+    setMessages(result as Message[]);
+  }, [chatId]);
+
+  const loadMessage = useCallback(async (messageId: string) => {
+    if (!chatId) return;
+    const { data } = await createClient()
         .from("messages")
         .select(
           "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
         )
         .eq("id", messageId)
         .single();
-      if (active && data) {
-        markChatRead(currentUserId, activeChat.id);
-        setMessages((old) => mergeMessages(old, [data as Message]));
-      }
+    if (data) {
+      markChatRead(currentUserId, chatId);
+      setMessages((old) => mergeMessages(old, [data as Message]));
     }
+  }, [chatId, currentUserId, mergeMessages]);
 
-    function handleMessage(event: Event) {
-      const detail = (event as CustomEvent<{
-        chatId: string;
-        messageId: string;
-      }>).detail;
-      if (detail.chatId === activeChat.id) void loadMessage(detail.messageId);
-    }
-    window.addEventListener(MESSAGE_EVENT, handleMessage);
-
-    void loadHistory()
-      .catch((caughtError) => {
-        if (active)
-          setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Unable to load messages.",
-          );
-      });
-    void loadStatus().catch((caughtError) => {
-      if (active)
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Unable to load chat status.",
-        );
-    });
-
-    async function subscribe() {
-      if (!active || connecting || channel) return;
-      connecting = true;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!active) return;
-      if (!session) {
-        connecting = false;
-        return;
-      }
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`dashboard-chat-${activeChat.id}-${crypto.randomUUID()}`)
+  const configure = useCallback(
+    (channel: RealtimeChannel) => {
+      if (!chatId) return channel;
+      return channel
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "messages" },
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `chat_id=eq.${chatId}`,
+          },
           (payload) => {
-            if (payload.new.chat_id === activeChat.id)
-              void loadMessage(payload.new.id as string);
+            void loadMessage(payload.new.id as string);
           },
         )
         .on(
@@ -154,61 +109,37 @@ export function ChatBox({
             event: "UPDATE",
             schema: "public",
             table: "chats",
-            filter: `id=eq.${activeChat.id}`,
+            filter: `id=eq.${chatId}`,
           },
           (payload) => {
-            if (active) setStatus(payload.new.status as Chat["status"]);
+            setStatus(payload.new.status as Chat["status"]);
           },
-        )
-        .subscribe((status) => {
-          if (!active) return;
-          connecting = false;
-          if (status === "SUBSCRIBED") {
-            void loadStatus().catch((caughtError) => {
-              if (active)
-                setError(
-                  caughtError instanceof Error
-                    ? caughtError.message
-                    : "Unable to load chat status.",
-                );
-            });
-            void loadHistory().catch((caughtError) => {
-              if (active)
-                setError(
-                  caughtError instanceof Error
-                    ? caughtError.message
-                    : "Unable to load messages.",
-                );
-            });
-          } else if (
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT" ||
-            status === "CLOSED"
-          ) {
-            const failedChannel = channel;
-            channel = null;
-            if (failedChannel) void supabase.removeChannel(failedChannel);
-            reconnectTimer = setTimeout(() => void subscribe(), 1000);
-          }
-        });
-    }
-
-    const {
-      data: { subscription: authSubscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))
-        void subscribe();
+        );
+    },
+    [chatId, loadMessage],
+  );
+  useRealtimeChannel(`dashboard-chat-${chatId ?? "none"}`, configure, (channelStatus) => {
+    if (channelStatus !== "SUBSCRIBED") return;
+    void loadStatus().catch((caughtError) => {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to load chat status.");
     });
-    void subscribe();
+    void loadHistory().catch((caughtError) => {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to load messages.");
+    });
+  });
 
-    return () => {
-      active = false;
-      window.removeEventListener(MESSAGE_EVENT, handleMessage);
-      authSubscription.unsubscribe();
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [chat, currentUserId]);
+  useEffect(() => {
+    if (!chatId) return;
+    markChatRead(currentUserId, chatId);
+    queueMicrotask(() => {
+      void loadHistory().catch((caughtError) => {
+        setError(caughtError instanceof Error ? caughtError.message : "Unable to load messages.");
+      });
+      void loadStatus().catch((caughtError) => {
+        setError(caughtError instanceof Error ? caughtError.message : "Unable to load chat status.");
+      });
+    });
+  }, [chatId, currentUserId, loadHistory, loadStatus]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });

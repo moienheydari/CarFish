@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/browser";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Chat } from "@/types/database";
 
 const READ_EVENT = "chat-read";
-export const MESSAGE_EVENT = "chat-message";
 
 function readKey(userId: string, chatId: string) {
   return `chat-read-${userId}-${chatId}`;
@@ -27,88 +27,62 @@ export function useUnreadChatCounts(
 ) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const chatIdsKey = chats.map((chat) => chat.id).join(",");
+  const chatIds = useMemo(
+    () => (chatIdsKey ? chatIdsKey.split(",") : []),
+    [chatIdsKey],
+  );
+  const chatIdSet = useMemo(() => new Set(chatIds), [chatIds]);
   const onNewUnreadRef = useRef(onNewUnread);
   useEffect(() => {
     onNewUnreadRef.current = onNewUnread;
   }, [onNewUnread]);
 
-  useEffect(() => {
-    let active = true;
-    const supabase = createClient();
-    const chatIds = chatIdsKey ? chatIdsKey.split(",") : [];
+  const loadCounts = useCallback(async () => {
+    const entries = await Promise.all(
+      chatIds.map(async (chatId) => {
+        const response = await fetch(`/api/chats/${chatId}/messages`);
+        if (!response.ok) return [chatId, 0] as const;
+        const messages = (await response.json()) as {
+          created_at: string;
+          sender_id: string;
+        }[];
+        const readAt = getReadAt(currentUserId, chatId);
+        if (!readAt && messages.length) {
+          const latestMessage = messages.reduce((latest, message) =>
+            message.created_at > latest.created_at ? message : latest,
+          );
+          localStorage.setItem(
+            readKey(currentUserId, chatId),
+            latestMessage.created_at,
+          );
+          return [chatId, 0] as const;
+        }
+        return [
+          chatId,
+          messages.filter(
+            (message) =>
+              message.sender_id !== currentUserId &&
+              (!readAt || message.created_at > readAt),
+          ).length,
+        ] as const;
+      }),
+    );
+    setCounts(Object.fromEntries(entries));
+  }, [chatIds, currentUserId]);
 
-    async function loadCounts() {
-      const entries = await Promise.all(
-        chatIds.map(async (chatId) => {
-          const response = await fetch(`/api/chats/${chatId}/messages`);
-          if (!response.ok) return [chatId, 0] as const;
-          const messages = (await response.json()) as {
-            created_at: string;
-            sender_id: string;
-          }[];
-          const readAt = getReadAt(currentUserId, chatId);
-          if (!readAt && messages.length) {
-            const latestMessage = messages.reduce((latest, message) =>
-              message.created_at > latest.created_at ? message : latest,
-            );
-            localStorage.setItem(
-              readKey(currentUserId, chatId),
-              latestMessage.created_at,
-            );
-            return [chatId, 0] as const;
-          }
-          return [
-            chatId,
-            messages.filter(
-              (message) =>
-                message.sender_id !== currentUserId &&
-                (!readAt || message.created_at > readAt),
-            ).length,
-          ] as const;
-        }),
-      );
-      if (active) setCounts(Object.fromEntries(entries));
-    }
-
-    void loadCounts();
-    const chatIdSet = new Set(chatIds);
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let connecting = false;
-
-    async function subscribe() {
-      if (!active || connecting || channel || !chatIds.length) return;
-      connecting = true;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!active) return;
-      if (!session) {
-        connecting = false;
-        return;
-      }
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`unread-chats-${currentUserId}-${crypto.randomUUID()}`)
+  const configure = useCallback(
+    (channel: RealtimeChannel) =>
+      channel
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages" },
           (payload) => {
             const chatId = payload.new.chat_id as string;
             if (
-              !active ||
               !chatIdSet.has(chatId) ||
               payload.new.sender_id === currentUserId
             )
               return;
-            window.dispatchEvent(
-              new CustomEvent(MESSAGE_EVENT, {
-                detail: {
-                  chatId,
-                  messageId: payload.new.id as string,
-                },
-              }),
-            );
             const readAt = getReadAt(currentUserId, chatId);
             if (payload.new.created_at <= readAt) return;
             setCounts((old) => ({
@@ -117,32 +91,16 @@ export function useUnreadChatCounts(
             }));
             onNewUnreadRef.current?.(chatId);
           },
-        )
-        .subscribe((status) => {
-          if (!active) return;
-          connecting = false;
-          if (status === "SUBSCRIBED") {
-            void loadCounts();
-          } else if (
-            status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT" ||
-            status === "CLOSED"
-          ) {
-            const failedChannel = channel;
-            channel = null;
-            if (failedChannel) void supabase.removeChannel(failedChannel);
-            retryTimer = setTimeout(() => void subscribe(), 1000);
-          }
-        });
-    }
+        ),
+    [chatIdSet, currentUserId, onNewUnreadRef],
+  );
 
-    const {
-      data: { subscription: authSubscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))
-        void subscribe();
-    });
-    void subscribe();
+  useRealtimeChannel(`unread-chats-${currentUserId}`, configure, (status) => {
+    if (status === "SUBSCRIBED") void loadCounts();
+  });
+
+  useEffect(() => {
+    queueMicrotask(() => void loadCounts());
 
     function handleRead(event: Event) {
       const chatId = (event as CustomEvent<string>).detail;
@@ -152,13 +110,9 @@ export function useUnreadChatCounts(
     window.addEventListener(READ_EVENT, handleRead);
 
     return () => {
-      active = false;
-      if (retryTimer) clearTimeout(retryTimer);
-      authSubscription.unsubscribe();
       window.removeEventListener(READ_EVENT, handleRead);
-      if (channel) void supabase.removeChannel(channel);
     };
-  }, [chatIdsKey, currentUserId]);
+  }, [chatIdSet, currentUserId, loadCounts]);
 
   return counts;
 }

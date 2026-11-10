@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import type { Profile, Vote } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
 import { ProfileButton } from "@/components/profile-modal";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export function VotePanel({
   players,
@@ -34,17 +36,17 @@ export function VotePanel({
   const [lockingTargetId, setLockingTargetId] = useState("");
   const [lockingFavorite, setLockingFavorite] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    const supabase = createClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let active = true;
-    async function subscribe() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!active || !session) return;
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`game-votes-${gameCode}-${crypto.randomUUID()}`)
-        .on(
+  const reconcileVotes = useCallback(async () => {
+    const { data, error: fetchError } = await createClient()
+      .from("votes")
+      .select("*")
+      .eq("game_code", gameCode)
+      .eq("voter_id", currentUserId);
+    if (!fetchError && data) setVotes(data as Vote[]);
+  }, [currentUserId, gameCode]);
+  const configure = useCallback(
+    (channel: RealtimeChannel) =>
+      channel.on(
           "postgres_changes",
           { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
           (payload) => {
@@ -66,15 +68,12 @@ export function VotePanel({
             else
               setGuesses((current) => ({ ...current, [incoming.target_id]: incoming.guess }));
           },
-        )
-        .subscribe();
-    }
-    void subscribe();
-    return () => {
-      active = false;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [currentUserId, gameCode]);
+        ),
+    [currentUserId, gameCode],
+  );
+  useRealtimeChannel(`game-votes-${gameCode}`, configure, (status) => {
+    if (status === "SUBSCRIBED") void reconcileVotes();
+  });
   const lockedCount = useMemo(
     () => targets.filter((target) => votes.some((vote) => vote.target_id === target.id && vote.status !== "unlocked")).length,
     [targets, votes],

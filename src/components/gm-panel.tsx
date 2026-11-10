@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { MessageCircle, Users } from "lucide-react";
 import Image from "next/image";
 import { ChatBox } from "@/components/chat-box";
@@ -10,6 +10,8 @@ import {
 } from "@/hooks/use-unread-chat-counts";
 import type { Chat, GamePhase, Profile, Vote, VoteStatus } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
+import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export function GmPanel({
   players,
@@ -46,18 +48,16 @@ export function GmPanel({
   const gameChats = gameChatsState.filter((chat) => chat.chat_type !== "with_gm");
   const gmChats = gameChatsState.filter((chat) => chat.chat_type === "with_gm");
 
-  useEffect(() => {
-    const supabase = createClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let active = true;
-
-    async function subscribe() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!active || !session) return;
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`gm-chats-${gameCode}-${crypto.randomUUID()}`)
-        .on(
+  const reconcileChats = useCallback(async () => {
+    const { data } = await createClient()
+      .from("chats")
+      .select("*")
+      .eq("game_code", gameCode);
+    if (data) setGameChatsState(data as Chat[]);
+  }, [gameCode]);
+  const configureChats = useCallback(
+    (channel: RealtimeChannel) =>
+      channel.on(
           "postgres_changes",
           {
             event: "*",
@@ -66,7 +66,6 @@ export function GmPanel({
             filter: `game_code=eq.${gameCode}`,
           },
           (payload) => {
-            if (!active) return;
             if (payload.eventType === "DELETE") {
               const deletedId = String(payload.old.id ?? "");
               setGameChatsState((current) =>
@@ -80,28 +79,23 @@ export function GmPanel({
               incoming,
             ]);
           },
-        )
-        .subscribe();
-    }
+        ),
+    [gameCode],
+  );
+  useRealtimeChannel(`gm-chats-${gameCode}`, configureChats, (status) => {
+    if (status === "SUBSCRIBED") void reconcileChats();
+  });
 
-    void subscribe();
-    return () => {
-      active = false;
-      if (channel) void supabase.removeChannel(channel);
-    };
+  const reconcileVotes = useCallback(async () => {
+    const { data } = await createClient()
+      .from("votes")
+      .select("*")
+      .eq("game_code", gameCode);
+    if (data) setReviewedVotes(data as Vote[]);
   }, [gameCode]);
-
-  useEffect(() => {
-    const supabase = createClient();
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    let active = true;
-    async function subscribe() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!active || !session) return;
-      await supabase.realtime.setAuth(session.access_token);
-      channel = supabase
-        .channel(`gm-votes-${gameCode}-${crypto.randomUUID()}`)
-        .on(
+  const configureVotes = useCallback(
+    (channel: RealtimeChannel) =>
+      channel.on(
           "postgres_changes",
           { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
           (payload) => {
@@ -116,15 +110,12 @@ export function GmPanel({
               incoming,
             ]);
           },
-        )
-        .subscribe();
-    }
-    void subscribe();
-    return () => {
-      active = false;
-      if (channel) void supabase.removeChannel(channel);
-    };
-  }, [gameCode]);
+        ),
+    [gameCode],
+  );
+  useRealtimeChannel(`gm-votes-${gameCode}`, configureVotes, (status) => {
+    if (status === "SUBSCRIBED") void reconcileVotes();
+  });
   const unreadCounts = useUnreadChatCounts(gameChatsState, currentUserId);
   const visibleVotes = reviewedVotes
     .filter((vote) => !hiddenVoteIds.has(vote.id))
