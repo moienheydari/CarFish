@@ -111,7 +111,7 @@ export function LoginButton({
         <button
           type="submit"
           disabled={busy}
-          className={`w-full rounded-xl px-5 py-3 font-semibold transition disabled:opacity-50 ${mode === "login"
+          className={`w-full cursor-pointer rounded-xl px-5 py-3 font-semibold transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 ${mode === "login"
             ? "bg-[var(--accent)] text-[#050505] hover:bg-white"
             : "bg-[#2f00ff] text-white hover:bg-white hover:text-[#050505]"
             }`}
@@ -126,7 +126,7 @@ export function LoginButton({
           setError("");
         }}
         disabled={busy}
-        className={`mt-4 w-full rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:opacity-50 ${mode === "login"
+        className={`mt-4 w-full cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50 ${mode === "login"
           ? "border-[var(--line)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
           : "border-[var(--line)] text-[var(--muted)] hover:border-[#2f00ff] hover:text-[#2f00ff]"
           }`}
@@ -146,7 +146,7 @@ export function LoginButton({
         type="button"
         onClick={loginWithGoogle}
         disabled={busy}
-        className="w-full rounded-xl bg-white px-5 py-3 font-semibold text-[#050505] transition hover:bg-[var(--accent)] disabled:opacity-50"
+        className="w-full cursor-pointer rounded-xl bg-white px-5 py-3 font-semibold text-[#050505] transition hover:bg-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         Continue with Google
       </button>

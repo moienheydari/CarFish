@@ -261,7 +261,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           type="button"
           onClick={joinGame}
           disabled={busy || gameCode.length !== 4}
-          className="rounded-xl border border-[var(--accent)] px-5 py-3 font-semibold text-[var(--accent)] disabled:opacity-50"
+          className="cursor-pointer rounded-xl border border-[var(--accent)] px-5 py-3 font-semibold text-[var(--accent)] transition hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Join
         </button>
@@ -269,7 +269,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           type="button"
           onClick={() => setCreateGameOpen(true)}
           disabled={busy || gameCode.length !== 4}
-          className="rounded-xl border border-[var(--line)] px-5 py-3 font-semibold disabled:opacity-50"
+          className="cursor-pointer rounded-xl border border-[var(--line)] px-5 py-3 font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Create
         </button>
@@ -322,7 +322,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         )}
         <button
           disabled={busy}
-          className="ml-auto rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] disabled:opacity-50"
+          className="ml-auto cursor-pointer rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? "Saving..." : "Save profile"}
         </button>

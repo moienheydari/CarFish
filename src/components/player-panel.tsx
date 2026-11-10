@@ -227,7 +227,7 @@ export function PlayerPanel({
 
   return (
     <section className="mt-4">
-      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
+      <div className="grid gap-5 lg:grid-cols-[1fr_350px]">
         <div>
           <div className="flex gap-2 overflow-x-auto">
             {!chats.length && (
@@ -250,11 +250,11 @@ export function PlayerPanel({
             mentionableProfiles={mentionableProfiles}
           />
         </div>
-        <aside className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <aside className="flex max-h-[80vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
+          <div className="mb-2 flex items-center gap-1 text-sm font-semibold">
             <UserRound size={20} /> Players
           </div>
-          <div className="space-y-2">
+          <div className="min-h-0 space-y-0.4 overflow-y-auto pr-1">
             {publicChat && (
               <div
                 onClick={() => selectChat(publicChat.id)}
@@ -264,7 +264,7 @@ export function PlayerPanel({
                   <MessageCircle size={18} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
+                  <span className="block truncate text-m font-medium">
                     Public Chat
                   </span>
                   <span className="block text-xs text-[var(--muted)]">
@@ -295,15 +295,15 @@ export function PlayerPanel({
                         if (allowPrivateChats) void openPrivateChat(player);
                       }
                     }}
-                    className={`relative flex cursor-pointer items-center gap-3 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${busyPlayerId === player.id ? "pointer-events-none opacity-50" : ""
+                    className={`relative flex cursor-pointer items-center gap-2 rounded-xl border border-transparent p-2 pr-8 hover:border-[var(--line)] hover:bg-[#2a0a0a] ${busyPlayerId === player.id ? "pointer-events-none opacity-50" : ""
                       } ${isPrivateChatSelected(player.id)
                         ? "border-[var(--accent)] bg-[#2a0a0a]"
                         : ""
                       }`}
                   >
-                    <ProfileButton profile={player} className="absolute left-1 top-1 z-10" />
+                    <ProfileButton profile={player} className="absolute left-0.5 top-0.5 z-10" />
                     <Avatar profile={player} />
-                    <span className="min-w-0 flex-1 truncate text-sm">
+                    <span className="min-w-0 flex-1 truncate text-m">
                       {player.display_name || "Unnamed player"}
                     </span>
                     <span className="shrink-0 text-xs text-[var(--accent)]">
@@ -345,7 +345,7 @@ function Avatar({ profile }: { profile: Profile }) {
       width={36}
       height={36}
       unoptimized
-      className="h-9 w-9 rounded-full object-cover"
+      className="h-12 w-12 rounded-full object-cover"
     />
   ) : (
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-xs font-semibold text-[var(--accent)]">

@@ -22,7 +22,7 @@ export function ProfileButton({
           event.stopPropagation();
           setOpen(true);
         }}
-        className={`grid h-4 w-4 place-items-center rounded-full border border-white bg-[#050505] text-[10px] font-bold leading-none text-white ${className}`}
+        className={`flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-white bg-[#050505] p-0 text-xs font-bold leading-none text-white transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] ${className}`}
       >
         !
       </button>
@@ -54,10 +54,10 @@ function ProfileModal({
         aria-modal="true"
         aria-labelledby="player-profile-title"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="relative">
+          <div className="flex flex-col items-center text-center">
             <Avatar profile={profile} />
-            <h2 id="player-profile-title" className="text-xl font-semibold">
+            <h2 id="player-profile-title" className="mt-2 text-3xl font-semibold">
               {profile.display_name || "Unnamed player"}
             </h2>
           </div>
@@ -65,7 +65,7 @@ function ProfileModal({
             type="button"
             onClick={onClose}
             aria-label="Close profile"
-            className="rounded-full border border-[var(--line)] px-3 py-1 text-lg"
+            className="absolute right-0 top-0 cursor-pointer rounded-full border border-[var(--line)] px-3 py-1 text-lg transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]"
           >
             ×
           </button>
@@ -99,13 +99,13 @@ function Avatar({ profile }: { profile: Profile }) {
     <Image
       src={profile.profile_image_url}
       alt=""
-      width={36}
-      height={36}
+      width={128}
+      height={128}
       unoptimized
-      className="h-9 w-9 rounded-full object-cover"
+      className="h-50 w-50 rounded-full object-cover"
     />
   ) : (
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-xs font-semibold text-[var(--accent)]">
+    <span className="grid h-50 w-50 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-4xl font-semibold text-[var(--accent)]">
       {(profile.display_name || "?").slice(0, 1).toUpperCase()}
     </span>
   );

@@ -107,7 +107,7 @@ export default async function DashboardPage() {
       (chat) => chat.chat_type === "with_gm" && userChatsIds.has(chat.id),
     ) as Chat | undefined) ?? null;
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-18 py-5">
+    <main className="mx-auto w-full max-w-[1600px] flex-1 px-25 py-5">
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <p className="text-sm text-[var(--accent)]">Your arena, Good Luck {profile?.display_name ?? "friend"}!</p>

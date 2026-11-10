@@ -159,7 +159,7 @@ export function VotePanel({
                       disabled={favoriteLocked}
                       onClick={() => setFavoriteId(player.id)}
                       aria-pressed={selected}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-60"
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {player.profile_image_url ? (
                         <Image
@@ -187,7 +187,7 @@ export function VotePanel({
               type="button"
               disabled={favoriteLocked || !favoriteId || lockingFavorite}
               onClick={() => void lockGuess(favoriteId, "decoy_favorite")}
-              className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${favoriteLocked || !favoriteId
+              className={`mt-3 cursor-pointer rounded-xl px-3 py-2 text-xs font-semibold transition hover:brightness-110 disabled:cursor-not-allowed ${favoriteLocked || !favoriteId
                   ? "bg-blue-900 text-blue-100"
                   : "bg-[var(--accent)] text-[#050505]"
                 }`}
@@ -225,7 +225,7 @@ export function VotePanel({
                     type="button"
                     disabled={Boolean(locked) || !guesses[player.id]?.trim() || Boolean(lockingTargetId)}
                     onClick={() => void lockGuess(player.id)}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold ${locked
+                    className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-semibold transition hover:brightness-110 disabled:cursor-not-allowed ${locked
                         ? "bg-blue-900 text-blue-100"
                         : "bg-[var(--accent)] text-[#050505]"
                       }`}

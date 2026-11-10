@@ -22,7 +22,7 @@ export function GmChatModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-20 flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] shadow-lg"
+        className="fixed bottom-5 right-5 z-20 flex cursor-pointer items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-[#050505] shadow-lg transition hover:bg-white hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       >
         <MessageCircle size={18} />
         Chat with GM
@@ -40,7 +40,7 @@ export function GmChatModal({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close game master chat"
-                className="rounded-full border border-[var(--line)] bg-[var(--panel)] p-2"
+                className="cursor-pointer rounded-full border border-[var(--line)] bg-[var(--panel)] p-2 transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 <X size={18} />
               </button>

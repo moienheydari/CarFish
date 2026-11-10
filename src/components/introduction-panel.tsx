@@ -76,7 +76,7 @@ export function IntroductionPanel({
           type="button"
           onClick={() => move(-1)}
           aria-label="Previous player"
-          className="rounded-full border border-[var(--line)] px-4 py-2 text-xl"
+          className="cursor-pointer rounded-full border border-[var(--line)] px-4 py-2 text-xl transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]"
         >
           ‹
         </button>
@@ -113,7 +113,7 @@ export function IntroductionPanel({
           type="button"
           onClick={() => move(1)}
           aria-label="Next player"
-          className="rounded-full border border-[var(--line)] px-4 py-2 text-xl"
+          className="cursor-pointer rounded-full border border-[var(--line)] px-4 py-2 text-xl transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]"
         >
           ›
         </button>

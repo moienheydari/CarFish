@@ -80,7 +80,7 @@ export type Message = {
   sender_id: string;
   content: string;
   created_at: string;
-  sender?: Pick<Profile, "display_name"> | null;
+  sender?: Pick<Profile, "display_name" | "profile_image_url"> | null;
 };
 
 export type Participant = {

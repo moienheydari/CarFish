@@ -178,7 +178,7 @@ export function GameCreateModal({
             type="button"
             onClick={closeModal}
             disabled={busy}
-            className="rounded-xl border border-[var(--line)] px-4 py-3 font-semibold disabled:opacity-50"
+            className="cursor-pointer rounded-xl border border-[var(--line)] px-4 py-3 font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] focus-visible:outline-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>
@@ -186,7 +186,7 @@ export function GameCreateModal({
             type="button"
             onClick={createGame}
             disabled={busy}
-            className="rounded-xl bg-[var(--accent)] px-4 py-3 font-semibold text-[#050505] disabled:opacity-50"
+            className="cursor-pointer rounded-xl bg-[var(--accent)] px-4 py-3 font-semibold text-[#050505] transition hover:bg-white focus-visible:outline-2 focus-visible:outline-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? "Creating..." : "Create game"}
           </button>

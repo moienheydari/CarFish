@@ -232,7 +232,7 @@ export function GmPanel({
             <button
               type="button"
               onClick={clearDisplayedVotes}
-              className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold"
+              className="cursor-pointer rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
             >
               Clear displayed votes
             </button>
@@ -257,17 +257,17 @@ export function GmPanel({
                 <div className="flex gap-2">
                   {vote.status === "pending" && (
                     <>
-                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="rounded-lg bg-emerald-700 px-2 py-1 text-xs">Correct</button>
+                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="cursor-pointer rounded-lg bg-emerald-700 px-2 py-1 text-xs transition hover:bg-emerald-600">Correct</button>
                       {!isDecoyFavorite && (
                         <>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="rounded-lg bg-amber-700 px-2 py-1 text-xs">Exists</button>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">None</button>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="cursor-pointer rounded-lg bg-amber-700 px-2 py-1 text-xs transition hover:bg-amber-600">Exists</button>
+                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-1 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">None</button>
                         </>
                       )}
                     </>
                   )}
                   {vote.status !== "unlocked" && (
-                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="rounded-lg border border-[var(--line)] px-2 py-1 text-xs">Unlock</button>
+                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-1 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">Unlock</button>
                   )}
                 </div>
               </div>
@@ -287,7 +287,7 @@ export function GmPanel({
         <button
           type="button"
           onClick={() => void togglePrivateChats()}
-          className={`rounded-xl px-3 py-2 text-sm font-semibold ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)]"}`}
+          className={`cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition hover:brightness-110 ${allowPrivateChats ? "bg-emerald-700" : "border border-[var(--line)] hover:bg-[#2a0a0a]"}`}
         >
           {allowPrivateChats ? "Enabled" : "Disabled"}
         </button>
@@ -303,7 +303,7 @@ export function GmPanel({
           type="button"
           onClick={() => void toggleAllGameChats()}
           disabled={chatStatusBusy || !gameChats.length}
-          className="rounded-xl border border-[var(--accent)] px-3 py-2 text-sm font-semibold text-[var(--accent)] disabled:opacity-50"
+          className="cursor-pointer rounded-xl border border-[var(--accent)] px-3 py-2 text-sm font-semibold text-[var(--accent)] transition hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {allGameChatsOpen ? "Close all chats" : "Open all chats"}
         </button>
