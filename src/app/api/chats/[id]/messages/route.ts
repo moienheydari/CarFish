@@ -15,21 +15,32 @@ export async function GET(
       { status: 401 },
     );
   const { id } = await params;
-  const before = new URL(request.url).searchParams.get("before");
+  const searchParams = new URL(request.url).searchParams;
+  const beforeCreatedAt = searchParams.get("before_created_at");
+  const beforeId = searchParams.get("before_id");
   let query = supabase
     .from("messages")
     .select("*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)")
     .eq("chat_id", id)
     .order("created_at", { ascending: false })
-    .limit(50);
-  if (before) query = query.lt("created_at", before);
+    .order("id", { ascending: false })
+    .limit(51);
+  if (beforeCreatedAt && beforeId) {
+    query = query.or(
+      `created_at.lt.${beforeCreatedAt},and(created_at.eq.${beforeCreatedAt},id.lt.${beforeId})`,
+    );
+  }
   const { data, error } = await query;
   if (error)
     return NextResponse.json(
       { error: "Unable to load messages." },
       { status: 403 },
     );
-  return NextResponse.json((data ?? []).reverse());
+  const rows = data ?? [];
+  return NextResponse.json({
+    messages: rows.slice(0, 50).reverse(),
+    has_more: rows.length > 50,
+  });
 }
 export async function POST(
   request: Request,

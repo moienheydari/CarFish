@@ -7,6 +7,8 @@ import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Chat, Message, Profile } from "@/types/database";
 
+const MAX_RETAINED_MESSAGES = 200;
+
 export function ChatBox({
   chat,
   currentUserId,
@@ -23,6 +25,8 @@ export function ChatBox({
   mentionableProfiles?: Profile[];
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,9 +55,9 @@ export function ChatBox({
       incoming.forEach((message) => byId.set(message.id, message));
       return [...byId.values()].sort(
         (left, right) =>
-          new Date(left.created_at).getTime() -
-          new Date(right.created_at).getTime(),
-      );
+          new Date(left.created_at).getTime() - new Date(right.created_at).getTime() ||
+          left.id.localeCompare(right.id),
+      ).slice(-MAX_RETAINED_MESSAGES);
   }, []);
 
   const loadStatus = useCallback(async () => {
@@ -69,8 +73,33 @@ export function ChatBox({
     const response = await fetch(`/api/chats/${chatId}/messages`);
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? "Unable to load messages.");
-    setMessages(result as Message[]);
+    setMessages(result.messages as Message[]);
+    setHasOlderMessages(Boolean(result.has_more));
   }, [chatId]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!chatId || !hasOlderMessages || loadingOlderMessages || messages.length >= MAX_RETAINED_MESSAGES)
+      return;
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+    setLoadingOlderMessages(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        before_created_at: oldestMessage.created_at,
+        before_id: oldestMessage.id,
+      });
+      const response = await fetch(`/api/chats/${chatId}/messages?${params}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to load older messages.");
+      setMessages((current) => mergeMessages(current, result.messages as Message[]));
+      setHasOlderMessages(Boolean(result.has_more));
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to load older messages.");
+    } finally {
+      setLoadingOlderMessages(false);
+    }
+  }, [chatId, hasOlderMessages, loadingOlderMessages, messages, mergeMessages]);
 
   const loadMessage = useCallback(async (messageId: string) => {
     if (!chatId) return;
@@ -158,9 +187,7 @@ export function ChatBox({
     });
     const result = await response.json();
     if (response.ok) {
-      setMessages((old) =>
-        old.some((item) => item.id === result.id) ? old : [...old, result],
-      );
+      setMessages((old) => mergeMessages(old, [result as Message]));
       setContent("");
       window.requestAnimationFrame(() => inputRef.current?.focus());
     } else setError(result.error ?? "Could not send message.");
@@ -265,6 +292,16 @@ export function ChatBox({
         )}
       </header>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        {hasOlderMessages && messages.length < MAX_RETAINED_MESSAGES && (
+          <button
+            type="button"
+            onClick={() => void loadOlderMessages()}
+            disabled={loadingOlderMessages}
+            className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-xs text-[var(--muted)] disabled:opacity-50"
+          >
+            {loadingOlderMessages ? "Loading older messages..." : "Load older messages"}
+          </button>
+        )}
         {messages.length ? (
           messages.map((message) => (
             <div
