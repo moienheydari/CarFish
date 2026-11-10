@@ -5,7 +5,7 @@ import type { Profile } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
 import { GameCreateModal } from "@/components/game-create-modal";
 
-const MAX_PROFILE_IMAGE_SIZE = 15 * 1024 * 1024;
+const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
 const PROFILE_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -153,7 +153,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
       return;
     }
     if (file.size > MAX_PROFILE_IMAGE_SIZE) {
-      setError("Profile images must be 15 MB or smaller.");
+      setError("Profile images must be 5 MB or smaller.");
       event.target.value = "";
       return;
     }
@@ -252,7 +252,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
           className="mt-2 block w-full rounded-xl border border-[var(--line)] bg-[#050505] px-4 py-3 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-3 file:py-2 file:font-semibold file:text-[#050505]"
         />
         <span className="mt-2 block text-xs text-[var(--muted)]">
-          JPEG, PNG, WebP, or GIF up to 15 MB.
+          JPEG, PNG, WebP, or GIF up to 5 MB.
           {imageFile ? ` Selected: ${imageFile.name}` : ""}
         </span>
       </label>
