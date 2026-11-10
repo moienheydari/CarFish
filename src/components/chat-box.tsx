@@ -82,10 +82,10 @@ export function ChatBox({
         .eq("id", messageId)
         .single();
     if (data) {
-      markChatRead(currentUserId, chatId);
+      void markChatRead(chatId);
       setMessages((old) => mergeMessages(old, [data as Message]));
     }
-  }, [chatId, currentUserId, mergeMessages]);
+  }, [chatId, mergeMessages]);
 
   const configure = useCallback(
     (channel: RealtimeChannel) => {
@@ -130,7 +130,7 @@ export function ChatBox({
 
   useEffect(() => {
     if (!chatId) return;
-    markChatRead(currentUserId, chatId);
+    void markChatRead(chatId);
     queueMicrotask(() => {
       void loadHistory().catch((caughtError) => {
         setError(caughtError instanceof Error ? caughtError.message : "Unable to load messages.");

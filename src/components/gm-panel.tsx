@@ -126,7 +126,7 @@ export function GmPanel({
     });
 
   function selectChat(chatId: string) {
-    markChatRead(currentUserId, chatId);
+    void markChatRead(chatId);
     setSelectedChatId(chatId);
   }
 

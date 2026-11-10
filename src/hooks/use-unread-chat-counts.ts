@@ -2,21 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
+import { createClient } from "@/lib/supabase/browser";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Chat } from "@/types/database";
 
 const READ_EVENT = "chat-read";
 
-function readKey(userId: string, chatId: string) {
-  return `chat-read-${userId}-${chatId}`;
-}
-
-function getReadAt(userId: string, chatId: string) {
-  return localStorage.getItem(readKey(userId, chatId)) ?? "";
-}
-
-export function markChatRead(userId: string, chatId: string) {
-  localStorage.setItem(readKey(userId, chatId), new Date().toISOString());
+export async function markChatRead(chatId: string) {
+  const { error } = await createClient().rpc("mark_chat_read", {
+    p_chat_id: chatId,
+  });
+  if (error) {
+    console.error("Could not mark chat as read.", {
+      chatId,
+      code: error.code,
+      message: error.message,
+    });
+  }
   window.dispatchEvent(new CustomEvent(READ_EVENT, { detail: chatId }));
 }
 
@@ -38,37 +40,29 @@ export function useUnreadChatCounts(
   }, [onNewUnread]);
 
   const loadCounts = useCallback(async () => {
-    const entries = await Promise.all(
-      chatIds.map(async (chatId) => {
-        const response = await fetch(`/api/chats/${chatId}/messages`);
-        if (!response.ok) return [chatId, 0] as const;
-        const messages = (await response.json()) as {
-          created_at: string;
-          sender_id: string;
-        }[];
-        const readAt = getReadAt(currentUserId, chatId);
-        if (!readAt && messages.length) {
-          const latestMessage = messages.reduce((latest, message) =>
-            message.created_at > latest.created_at ? message : latest,
-          );
-          localStorage.setItem(
-            readKey(currentUserId, chatId),
-            latestMessage.created_at,
-          );
-          return [chatId, 0] as const;
-        }
-        return [
-          chatId,
-          messages.filter(
-            (message) =>
-              message.sender_id !== currentUserId &&
-              (!readAt || message.created_at > readAt),
-          ).length,
-        ] as const;
-      }),
+    if (!chatIds.length) {
+      setCounts({});
+      return;
+    }
+    const { data, error } = await createClient().rpc("get_unread_chat_counts", {
+      p_chat_ids: chatIds,
+    });
+    if (error) {
+      console.error("Could not load unread chat counts.", {
+        code: error.code,
+        message: error.message,
+      });
+      return;
+    }
+    const nextCounts = Object.fromEntries(
+      ((data ?? []) as { chat_id: string; unread_count: number | string }[]).map(
+        (entry) => [entry.chat_id, Number(entry.unread_count)],
+      ),
     );
-    setCounts(Object.fromEntries(entries));
-  }, [chatIds, currentUserId]);
+    setCounts(
+      Object.fromEntries(chatIds.map((chatId) => [chatId, nextCounts[chatId] ?? 0])),
+    );
+  }, [chatIds]);
 
   const configure = useCallback(
     (channel: RealtimeChannel) =>
@@ -83,8 +77,6 @@ export function useUnreadChatCounts(
               payload.new.sender_id === currentUserId
             )
               return;
-            const readAt = getReadAt(currentUserId, chatId);
-            if (payload.new.created_at <= readAt) return;
             setCounts((old) => ({
               ...old,
               [chatId]: (old[chatId] ?? 0) + 1,

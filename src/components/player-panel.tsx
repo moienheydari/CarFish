@@ -167,7 +167,7 @@ export function PlayerPanel({
   });
 
   function selectChat(chatId: string) {
-    markChatRead(currentUserId, chatId);
+    void markChatRead(chatId);
     setSelectedChatId(chatId);
   }
 
