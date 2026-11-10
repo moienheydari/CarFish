@@ -2,6 +2,8 @@ create extension if not exists "pgcrypto";
 
 -- This file is intentionally destructive: it rebuilds the schema from scratch.
 drop table if exists public.messages cascade;
+drop table if exists public.round_scores cascade;
+drop table if exists public.rounds cascade;
 drop table if exists public.votes cascade;
 drop table if exists public.room_members cascade;
 drop table if exists public.chat_members cascade;
@@ -15,12 +17,14 @@ drop type if exists public.chat_status cascade;
 drop type if exists public.game_phase cascade;
 drop type if exists public.vote_status cascade;
 drop type if exists public.vote_kind cascade;
+drop type if exists public.round_status cascade;
 
 create type public.chat_type as enum ('public', 'private', 'with_gm');
 create type public.chat_status as enum ('open', 'locked');
 create type public.game_phase as enum ('not_started', 'chat_phase', 'vote_phase', 'final');
 create type public.vote_status as enum ('unlocked', 'pending', 'correct', 'exists', 'none');
 create type public.vote_kind as enum ('guess', 'decoy_favorite');
+create type public.round_status as enum ('active', 'finalized');
 
 create table public.games (
   game_code varchar(4) primary key check (game_code ~ '^[A-Za-z0-9]{4}$'),
@@ -52,6 +56,23 @@ create table public.profiles (
   constraint bio_length check (bio is null or char_length(bio) <= 280)
 );
 
+create table public.rounds (
+  id uuid primary key default gen_random_uuid(),
+  game_code varchar(4) not null references public.games(game_code) on delete cascade,
+  round_number integer not null check (round_number > 0),
+  status public.round_status not null default 'active',
+  finalized_at timestamptz,
+  unique (game_code, round_number),
+  check (
+    (status = 'active' and finalized_at is null)
+    or (status = 'finalized' and finalized_at is not null)
+  )
+);
+
+create unique index rounds_one_active_per_game_idx
+  on public.rounds (game_code)
+  where status = 'active';
+
 create table public.votes (
   id uuid primary key default gen_random_uuid(),
   game_code varchar(4) not null references public.games(game_code) on delete cascade,
@@ -62,7 +83,15 @@ create table public.votes (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   vote_kind public.vote_kind not null default 'guess',
+  round_id uuid not null references public.rounds(id) on delete cascade,
   check (voter_id <> target_id)
+);
+
+create table public.round_scores (
+  round_id uuid not null references public.rounds(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  points integer not null check (points >= 0),
+  primary key (round_id, user_id)
 );
 
 create table public.chats (
@@ -73,14 +102,26 @@ create table public.chats (
   created_by uuid not null references public.profiles(id) on delete restrict,
   chat_type public.chat_type not null default 'public',
   status public.chat_status not null default 'open',
+  private_participant_one_id uuid references public.profiles(id) on delete cascade,
+  private_participant_two_id uuid references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint private_chat_participants_check check (
+    (chat_type = 'private'
+      and private_participant_one_id is not null
+      and private_participant_two_id is not null
+      and private_participant_one_id < private_participant_two_id)
+    or (chat_type <> 'private'
+      and private_participant_one_id is null
+      and private_participant_two_id is null)
+  )
 );
 
 create table public.chat_members (
   chat_id uuid not null references public.chats(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
   joined_at timestamptz not null default now(),
+  last_read_at timestamptz,
   primary key (chat_id, user_id)
 );
 
@@ -98,6 +139,17 @@ create index chat_members_user_id_idx on public.chat_members(user_id);
 create index messages_chat_created_at_idx on public.messages(chat_id, created_at desc);
 create index votes_game_voter_idx on public.votes(game_code, voter_id);
 create index votes_game_status_idx on public.votes(game_code, status);
+create index rounds_game_code_idx on public.rounds(game_code, round_number desc);
+create index round_scores_user_id_idx on public.round_scores(user_id);
+create index votes_round_id_idx on public.votes(round_id);
+create index chat_members_user_read_idx on public.chat_members(user_id, chat_id, last_read_at);
+create unique index chats_private_participants_unique_idx
+  on public.chats (
+    game_code,
+    private_participant_one_id,
+    private_participant_two_id
+  )
+  where chat_type = 'private';
 
 insert into storage.buckets (
   id,
@@ -125,4 +177,6 @@ alter table public.chats enable row level security;
 alter table public.chat_members enable row level security;
 alter table public.messages enable row level security;
 alter table public.votes enable row level security;
+alter table public.rounds enable row level security;
+alter table public.round_scores enable row level security;
 alter table public.games add column decoy_favorite_id uuid references public.profiles(id) on delete set null;
