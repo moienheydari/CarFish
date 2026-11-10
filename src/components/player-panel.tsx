@@ -76,8 +76,9 @@ export function PlayerPanel({
       channel
         .on(
           "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "games", filter: `game_code=eq.${gameCode}` },
+          { event: "UPDATE", schema: "public", table: "games" },
           (payload) => {
+            if (payload.new.game_code !== gameCode) return;
             setAllowPrivateChats(Boolean(payload.new.allow_private_chats));
           },
         )
@@ -87,15 +88,17 @@ export function PlayerPanel({
             event: "*",
             schema: "public",
             table: "chats",
-            filter: `game_code=eq.${gameCode}`,
           },
           (payload) => {
+            const incoming = (payload.eventType === "DELETE"
+              ? payload.old
+              : payload.new) as Chat;
+            if (incoming.game_code !== gameCode) return;
             if (payload.eventType === "DELETE") {
-              const deletedId = String(payload.old.id ?? "");
+              const deletedId = String(incoming.id ?? "");
               setChats((current) => current.filter((chat) => chat.id !== deletedId));
               return;
             }
-            const incoming = payload.new as Chat;
             setChats((current) => [
               ...current.filter((chat) => chat.id !== incoming.id),
               incoming,
@@ -105,62 +108,40 @@ export function PlayerPanel({
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "*",
             schema: "public",
             table: "chat_members",
-            filter: `user_id=eq.${currentUserId}`,
           },
-          async (payload) => {
-            const membership = payload.new as { chat_id: string; user_id: string };
-            const { data: incoming } = await createClient()
-              .from("chats")
-              .select("*")
-              .eq("id", membership.chat_id)
-              .eq("game_code", gameCode)
-              .maybeSingle();
-            if (incoming) {
-              setChats((current) => [
-                ...current.filter((chat) => chat.id !== incoming.id),
-                incoming as Chat,
-              ]);
-              setChatMembers((current) => [
-                ...current.filter(
+          (payload) => {
+            const membership = (payload.eventType === "DELETE"
+              ? payload.old
+              : payload.new) as { chat_id: string; user_id: string };
+            if (payload.eventType === "DELETE") {
+              setChatMembers((current) =>
+                current.filter(
                   (member) =>
                     !(
                       member.chat_id === membership.chat_id &&
                       member.user_id === membership.user_id
                     ),
                 ),
-                membership,
-              ]);
+              );
+              return;
             }
-          },
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "public",
-            table: "chat_members",
-            filter: `user_id=eq.${currentUserId}`,
-          },
-          (payload) => {
-            const membership = payload.old as { chat_id: string; user_id: string };
-            setChatMembers((current) =>
-              current.filter(
+            setChatMembers((current) => [
+              ...current.filter(
                 (member) =>
                   !(
                     member.chat_id === membership.chat_id &&
                     member.user_id === membership.user_id
                   ),
               ),
-            );
-            setChats((current) =>
-              current.filter((chat) => chat.id !== membership.chat_id),
-            );
+              membership,
+            ]);
+            if (membership.user_id === currentUserId) void reconcileChats();
           },
         ),
-    [currentUserId, gameCode],
+    [currentUserId, gameCode, reconcileChats],
   );
   useRealtimeChannel(`player-game-${gameCode}-${currentUserId}`, configure, (status) => {
     if (status === "SUBSCRIBED") void reconcileChats();
@@ -245,7 +226,7 @@ export function PlayerPanel({
   const publicChat = chats.find((chat) => chat.chat_type === "public");
 
   return (
-    <section className="mt-10">
+    <section className="mt-4">
       <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
         <div>
           <div className="flex gap-2 overflow-x-auto">

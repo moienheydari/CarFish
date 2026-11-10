@@ -13,7 +13,7 @@ export default function LoginPage({
   const [mode, setMode] = useState<"login" | "signup">("login");
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 items-center px-5 py-16">
+    <main className="mx-auto flex w-full max-w-md flex-1 items-center px-5 py-5">
       <div className="w-full rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-8 text-center">
         <div className="mx-auto mb-3 size-18 place-items-center rounded-2xl">
           <Image
@@ -28,16 +28,12 @@ export default function LoginPage({
           Welcome to Car
           <span className={mode === "login" ? "text-[var(--accent)]" : "text-[#2f00ff]"}>Fish</span>
         </h1>
-      <p className="mt-3 text-[var(--muted)]">
-        Sign in or create an account to find your people and join the
-        conversation.
-      </p>
-      <LoginButton
-        mode={mode}
-        setMode={setMode}
-        searchParams={searchParams}
-      />
-    </div>
+        <LoginButton
+          mode={mode}
+          setMode={setMode}
+          searchParams={searchParams}
+        />
+      </div>
     </main >
   );
 }

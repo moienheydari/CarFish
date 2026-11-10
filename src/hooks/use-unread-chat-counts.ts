@@ -34,7 +34,11 @@ export function useUnreadChatCounts(
     [chatIdsKey],
   );
   const chatIdSet = useMemo(() => new Set(chatIds), [chatIds]);
+  const chatIdSetRef = useRef(chatIdSet);
   const onNewUnreadRef = useRef(onNewUnread);
+  useEffect(() => {
+    chatIdSetRef.current = new Set(chatIdsKey ? chatIdsKey.split(",") : []);
+  }, [chatIdsKey]);
   useEffect(() => {
     onNewUnreadRef.current = onNewUnread;
   }, [onNewUnread]);
@@ -73,7 +77,7 @@ export function useUnreadChatCounts(
           (payload) => {
             const chatId = payload.new.chat_id as string;
             if (
-              !chatIdSet.has(chatId) ||
+              !chatIdSetRef.current.has(chatId) ||
               payload.new.sender_id === currentUserId
             )
               return;
@@ -84,7 +88,7 @@ export function useUnreadChatCounts(
             onNewUnreadRef.current?.(chatId);
           },
         ),
-    [chatIdSet, currentUserId, onNewUnreadRef],
+    [currentUserId],
   );
 
   useRealtimeChannel(`unread-chats-${currentUserId}`, configure, (status) => {

@@ -49,28 +49,28 @@ export function VotePanel({
   const configure = useCallback(
     (channel: RealtimeChannel) =>
       channel.on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
-          (payload) => {
-            const incoming = payload.new as Vote;
-            if (payload.eventType === "DELETE") {
-              const deletedId = String(payload.old.id ?? "");
-              setVotes((current) => current.filter((vote) => vote.id !== deletedId));
-              return;
-            }
-            if (incoming.voter_id !== currentUserId) return;
-            setVotes((current) => [
-              ...current.filter((vote) => vote.id !== incoming.id),
-              incoming,
-            ]);
-            if (incoming.vote_kind === "decoy_favorite")
-              setFavoriteLocked(incoming.status !== "unlocked");
-            if (incoming.vote_kind === "decoy_favorite")
-              setFavoriteId(incoming.target_id);
-            else
-              setGuesses((current) => ({ ...current, [incoming.target_id]: incoming.guess }));
-          },
-        ),
+        "postgres_changes",
+        { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
+        (payload) => {
+          const incoming = payload.new as Vote;
+          if (payload.eventType === "DELETE") {
+            const deletedId = String(payload.old.id ?? "");
+            setVotes((current) => current.filter((vote) => vote.id !== deletedId));
+            return;
+          }
+          if (incoming.voter_id !== currentUserId) return;
+          setVotes((current) => [
+            ...current.filter((vote) => vote.id !== incoming.id),
+            incoming,
+          ]);
+          if (incoming.vote_kind === "decoy_favorite")
+            setFavoriteLocked(incoming.status !== "unlocked");
+          if (incoming.vote_kind === "decoy_favorite")
+            setFavoriteId(incoming.target_id);
+          else
+            setGuesses((current) => ({ ...current, [incoming.target_id]: incoming.guess }));
+        },
+      ),
     [currentUserId, gameCode],
   );
   useRealtimeChannel(`game-votes-${gameCode}`, configure, (status) => {
@@ -126,7 +126,7 @@ export function VotePanel({
   }
 
   return (
-    <section className="mx-auto mt-10 max-w-3xl rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-6">
+    <section className="mx-auto mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-6">
       <p className="text-sm text-[var(--accent)]">Vote phase</p>
       <h2 className="mt-1 text-2xl font-semibold">
         {isDecoy ? "Choose your favorite player" : "Who is each player?"}
@@ -146,8 +146,8 @@ export function VotePanel({
                   <div
                     key={player.id}
                     className={`relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${selected
-                        ? "border-[var(--accent)] bg-[#2a0a0a]"
-                        : "border-[var(--line)]"
+                      ? "border-[var(--accent)] bg-[#2a0a0a]"
+                      : "border-[var(--line)]"
                       }`}
                   >
                     <ProfileButton
@@ -187,11 +187,10 @@ export function VotePanel({
               type="button"
               disabled={favoriteLocked || !favoriteId || lockingFavorite}
               onClick={() => void lockGuess(favoriteId, "decoy_favorite")}
-              className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${
-                favoriteLocked || !favoriteId
+              className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${favoriteLocked || !favoriteId
                   ? "bg-blue-900 text-blue-100"
                   : "bg-[var(--accent)] text-[#050505]"
-              }`}
+                }`}
             >
               {lockingFavorite ? "Locking..." : favoriteLocked ? "Locked" : "Lock in"}
             </button>
@@ -226,11 +225,10 @@ export function VotePanel({
                     type="button"
                     disabled={Boolean(locked) || !guesses[player.id]?.trim() || Boolean(lockingTargetId)}
                     onClick={() => void lockGuess(player.id)}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                      locked
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold ${locked
                         ? "bg-blue-900 text-blue-100"
                         : "bg-[var(--accent)] text-[#050505]"
-                    }`}
+                      }`}
                   >
                     {lockingTargetId === player.id ? "Locking..." : locked ? "Locked" : "Lock in"}
                   </button>

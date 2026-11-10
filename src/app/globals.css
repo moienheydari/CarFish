@@ -64,6 +64,9 @@ body {
     radial-gradient(circle at 15% 0%, rgba(239, 68, 68, 0.18), transparent 30rem),
     radial-gradient(circle at 90% 15%, rgba(185, 28, 28, 0.16), transparent 26rem),
     var(--background);
+  background-attachment: fixed !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }

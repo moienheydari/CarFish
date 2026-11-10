@@ -51,13 +51,13 @@ export function ChatBox({
   }, [chatId, canSend, status]);
 
   const mergeMessages = useCallback((existing: Message[], incoming: Message[]) => {
-      const byId = new Map(existing.map((message) => [message.id, message]));
-      incoming.forEach((message) => byId.set(message.id, message));
-      return [...byId.values()].sort(
-        (left, right) =>
-          new Date(left.created_at).getTime() - new Date(right.created_at).getTime() ||
-          left.id.localeCompare(right.id),
-      ).slice(-MAX_RETAINED_MESSAGES);
+    const byId = new Map(existing.map((message) => [message.id, message]));
+    incoming.forEach((message) => byId.set(message.id, message));
+    return [...byId.values()].sort(
+      (left, right) =>
+        new Date(left.created_at).getTime() - new Date(right.created_at).getTime() ||
+        left.id.localeCompare(right.id),
+    ).slice(-MAX_RETAINED_MESSAGES);
   }, []);
 
   const loadStatus = useCallback(async () => {
@@ -104,12 +104,12 @@ export function ChatBox({
   const loadMessage = useCallback(async (messageId: string) => {
     if (!chatId) return;
     const { data } = await createClient()
-        .from("messages")
-        .select(
-          "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
-        )
-        .eq("id", messageId)
-        .single();
+      .from("messages")
+      .select(
+        "*, sender:profiles!messages_sender_id_fkey(display_name,profile_image_url)",
+      )
+      .eq("id", messageId)
+      .single();
     if (data) {
       void markChatRead(chatId);
       setMessages((old) => mergeMessages(old, [data as Message]));
@@ -279,15 +279,12 @@ export function ChatBox({
 
   return (
     <section className="flex h-[28rem] min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] p-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] p-3">
         <div>
-          <p className="text-xs uppercase tracking-wider text-[var(--accent)]">
-            {chat.chat_type} chat
-          </p>
+          <h2 className="mt-1 font-semibold">{chat.name}</h2>
           <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${status === "open" ? "bg-emerald-700 text-white" : "bg-rose-900 text-rose-100"}`}>
             {status === "open" ? "Open for messages" : "Closed for players"}
           </span>
-          <h2 className="mt-1 font-semibold">{chat.name}</h2>
         </div>
         {canManage && (
           <button

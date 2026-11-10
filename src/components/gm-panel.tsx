@@ -58,28 +58,28 @@ export function GmPanel({
   const configureChats = useCallback(
     (channel: RealtimeChannel) =>
       channel.on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "chats",
-            filter: `game_code=eq.${gameCode}`,
-          },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              const deletedId = String(payload.old.id ?? "");
-              setGameChatsState((current) =>
-                current.filter((chat) => chat.id !== deletedId),
-              );
-              return;
-            }
-            const incoming = payload.new as Chat;
-            setGameChatsState((current) => [
-              ...current.filter((chat) => chat.id !== incoming.id),
-              incoming,
-            ]);
-          },
-        ),
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chats",
+          filter: `game_code=eq.${gameCode}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = String(payload.old.id ?? "");
+            setGameChatsState((current) =>
+              current.filter((chat) => chat.id !== deletedId),
+            );
+            return;
+          }
+          const incoming = payload.new as Chat;
+          setGameChatsState((current) => [
+            ...current.filter((chat) => chat.id !== incoming.id),
+            incoming,
+          ]);
+        },
+      ),
     [gameCode],
   );
   useRealtimeChannel(`gm-chats-${gameCode}`, configureChats, (status) => {
@@ -96,21 +96,21 @@ export function GmPanel({
   const configureVotes = useCallback(
     (channel: RealtimeChannel) =>
       channel.on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              const deletedId = String(payload.old.id ?? "");
-              setReviewedVotes((current) => current.filter((vote) => vote.id !== deletedId));
-              return;
-            }
-            const incoming = payload.new as Vote;
-            setReviewedVotes((current) => [
-              ...current.filter((vote) => vote.id !== incoming.id),
-              incoming,
-            ]);
-          },
-        ),
+        "postgres_changes",
+        { event: "*", schema: "public", table: "votes", filter: `game_code=eq.${gameCode}` },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = String(payload.old.id ?? "");
+            setReviewedVotes((current) => current.filter((vote) => vote.id !== deletedId));
+            return;
+          }
+          const incoming = payload.new as Vote;
+          setReviewedVotes((current) => [
+            ...current.filter((vote) => vote.id !== incoming.id),
+            incoming,
+          ]);
+        },
+      ),
     [gameCode],
   );
   useRealtimeChannel(`gm-votes-${gameCode}`, configureVotes, (status) => {
@@ -220,7 +220,7 @@ export function GmPanel({
   }
 
   return (
-    <section className="mt-10">
+    <section className="mt-2">
       <div className="mb-5">
         <p className="text-sm text-[var(--accent)]">Game master panel</p>
         <h2 className="mt-1 text-2xl font-semibold">Players and conversations</h2>

@@ -15,7 +15,7 @@ export function FinalPanel({
   );
 
   return (
-    <section className="mx-auto mt-10 max-w-4xl">
+    <section className="mx-auto mt-10 w-full">
       <div className="mb-6 text-center">
         <p className="text-sm text-[var(--accent)]">Final results</p>
         <h2 className="mt-1 text-3xl font-semibold">The game is complete</h2>
