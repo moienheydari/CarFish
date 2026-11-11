@@ -73,7 +73,7 @@ export default async function DashboardPage() {
     .select("id,game_code,round_id,voter_id,target_id,guess,status,vote_kind,created_at,updated_at")
     .eq("game_code", profile.game_code);
   if (!profile.is_gm) votesQuery.eq("round_id", activeRound?.id ?? "");
-  const [{ data: userChats }, { data: votes }, { data: finalGuessCounts }] =
+  const [{ data: userChats }, { data: votes }] =
     await Promise.all([
       userChatIds.length
         ? supabase
@@ -82,21 +82,7 @@ export default async function DashboardPage() {
           .in("chat_id", userChatIds)
         : Promise.resolve({ data: [] as { chat_id: string; user_id: string }[] }),
       votesQuery,
-      game?.phase === "final"
-        ? supabase.rpc("get_final_guess_counts", {
-          p_game_code: profile.game_code,
-        })
-        : Promise.resolve({ data: null }),
     ]);
-  const correctGuessCounts = Object.fromEntries(
-    (finalGuessCounts ?? []).map((item: {
-      target_id: string;
-      correct_guess_count: number | string;
-    }) => [
-        item.target_id,
-        Number(item.correct_guess_count),
-      ]),
-  );
   const userChatsIds = new Set(userChatIds);
   const chats = (chatRows ?? []).filter(
     (chat) =>
@@ -158,10 +144,7 @@ export default async function DashboardPage() {
                 )}
               </>
             ) : game?.phase === "final" ? (
-              <FinalPanel
-                players={(players ?? []) as Profile[]}
-                correctGuessCounts={correctGuessCounts}
-              />
+              <FinalPanel players={(players ?? []) as Profile[]} />
             ) : (
               <>
                 <PlayerPanel

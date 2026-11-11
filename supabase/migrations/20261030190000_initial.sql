@@ -33,7 +33,9 @@ create table public.games (
   correct_score integer not null default 3 check (correct_score >= 0),
   exist_score integer not null default 1 check (exist_score >= 0),
   allow_private_chats boolean not null default false
-  ,decoy_score integer not null default 0 check (decoy_score >= 0)
+  ,decoy_score integer not null default 0 check (decoy_score >= 0),
+  created_at timestamptz not null default now(),
+  final_phase_at timestamptz
 );
 
 create table public.profiles (
@@ -85,7 +87,9 @@ create table public.votes (
   updated_at timestamptz not null default now(),
   vote_kind public.vote_kind not null default 'guess',
   round_id uuid not null references public.rounds(id) on delete cascade,
-  check (voter_id <> target_id)
+  check (voter_id <> target_id),
+  constraint votes_game_voter_target_round_unique
+    unique (game_code, voter_id, target_id, round_id)
 );
 
 create table public.round_scores (

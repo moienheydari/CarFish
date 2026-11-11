@@ -136,6 +136,18 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
   }
 
   async function joinGame() {
+    const missingNames = [
+      !values.real_name.trim() ? "real name" : "",
+      !values.display_name.trim() ? "display name" : "",
+    ].filter(Boolean);
+    if (missingNames.length > 0) {
+      setMessage("");
+      setError(
+        `Enter your ${missingNames.join(" and ")} before joining the game.`,
+      );
+      return;
+    }
+
     setBusy(true);
     setError("");
     try {

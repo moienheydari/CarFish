@@ -1,8 +1,23 @@
+create extension if not exists pg_cron with schema pg_catalog;
+
 create or replace function public.touch_updated_at() returns trigger
 language plpgsql
 as $$
 begin
   new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.track_final_phase_at() returns trigger
+language plpgsql
+as $$
+begin
+  if new.phase = 'final' and old.phase <> 'final' then
+    new.final_phase_at = now();
+  elsif new.phase <> 'final' then
+    new.final_phase_at = null;
+  end if;
   return new;
 end;
 $$;
@@ -70,6 +85,7 @@ $$;
 
 drop trigger if exists profiles_updated_at on public.profiles;
 drop trigger if exists profiles_role_fields on public.profiles;
+drop trigger if exists games_final_phase_at on public.games;
 drop trigger if exists chats_updated_at on public.chats;
 drop trigger if exists private_chat_members_limit on public.chat_members;
 drop trigger if exists votes_updated_at on public.votes;
@@ -78,6 +94,8 @@ create trigger profiles_updated_at before update on public.profiles
 for each row execute function public.touch_updated_at();
 create trigger profiles_role_fields before update on public.profiles
 for each row execute function public.protect_profile_role_fields();
+create trigger games_final_phase_at before update on public.games
+for each row execute function public.track_final_phase_at();
 create trigger chats_updated_at before update on public.chats
 for each row execute function public.touch_updated_at();
 create trigger private_chat_members_limit before insert on public.chat_members
@@ -505,6 +523,100 @@ revoke execute on function public.change_game_phase(varchar(4), public.game_phas
 grant execute on function public.change_game_phase(varchar(4), public.game_phase) to authenticated;
 revoke execute on function public.send_round_results(varchar(4)) from public;
 grant execute on function public.send_round_results(varchar(4)) to authenticated;
+
+create or replace function public.cleanup_expired_final_games()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  deleted_games integer;
+  cleanup_delay interval := interval '45 minutes';
+  active_cleanup_delay interval := interval '2 hours';
+  eligible_game_codes varchar(4)[];
+begin
+  select coalesce(array_agg(game.game_code), array[]::varchar(4)[])
+  into eligible_game_codes
+  from public.games game
+  where (
+    game.phase = 'final'
+    and game.final_phase_at <= now() - cleanup_delay
+  )
+  or (
+    game.phase <> 'final'
+    and coalesce(
+      (
+        select max(round.finalized_at)
+        from public.rounds round
+        where round.game_code = game.game_code
+      ),
+      game.created_at
+    ) <= now() - active_cleanup_delay
+  );
+
+  delete from public.messages
+  where chat_id in (
+    select id
+    from public.chats
+    where game_code = any(eligible_game_codes)
+  );
+
+  delete from public.chat_members
+  where chat_id in (
+    select id
+    from public.chats
+    where game_code = any(eligible_game_codes)
+  );
+
+  delete from public.chats
+  where game_code = any(eligible_game_codes);
+
+  delete from public.votes
+  where game_code = any(eligible_game_codes);
+
+  delete from public.round_scores
+  where round_id in (
+    select id
+    from public.rounds
+    where game_code = any(eligible_game_codes)
+  );
+
+  delete from public.rounds
+  where game_code = any(eligible_game_codes);
+
+  update public.profiles
+  set real_name = null,
+      display_name = null,
+      profile_image_url = null,
+      job = null,
+      age = null,
+      bio = null,
+      is_gm = false,
+      is_decoy = false,
+      score = 0,
+      current_score = 0,
+      game_code = null,
+      created_at = now(),
+      updated_at = now()
+  where game_code = any(eligible_game_codes);
+
+  delete from public.games
+  where game_code = any(eligible_game_codes);
+
+  get diagnostics deleted_games = row_count;
+  return deleted_games;
+end;
+$$;
+
+revoke execute on function public.cleanup_expired_final_games() from public;
+grant execute on function public.cleanup_expired_final_games() to postgres;
+
+select cron.schedule(
+  'cleanup-final-games',
+  '* * * * *',
+  'select public.cleanup_expired_final_games();'
+);
 
 create policy "Players read rounds in their game"
 on public.rounds
@@ -996,29 +1108,6 @@ with check (
       and gm.game_code = votes.game_code
   )
 );
-
-create or replace function public.get_final_guess_counts(
-  p_game_code varchar(4)
-) returns table(target_id uuid, correct_guess_count bigint)
-language sql
-security definer
-set search_path = public
-as $$
-  select v.target_id, count(*)::bigint
-  from public.votes v
-  join public.games g on g.game_code = v.game_code
-  join public.profiles viewer
-    on viewer.id = (select auth.uid())
-   and viewer.game_code = v.game_code
-  where v.game_code = p_game_code
-    and g.phase = 'final'
-    and v.vote_kind = 'guess'
-    and v.status = 'correct'
-  group by v.target_id;
-$$;
-
-revoke execute on function public.get_final_guess_counts(varchar(4)) from public;
-grant execute on function public.get_final_guess_counts(varchar(4)) to authenticated;
 
 do $$
 begin

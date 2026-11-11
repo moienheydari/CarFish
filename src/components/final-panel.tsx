@@ -5,29 +5,23 @@ import type { Profile } from "@/types/database";
 
 export function FinalPanel({
   players,
-  correctGuessCounts,
 }: {
   players: Profile[];
-  correctGuessCounts: Record<string, number>;
 }) {
   const results = [...players].sort(
     (left, right) => right.score - left.score || left.display_name?.localeCompare(right.display_name ?? "") || 0,
   );
 
   return (
-    <section className="mx-auto mt-10 w-full">
-      <div className="mb-6 text-center">
-        <p className="text-sm text-[var(--accent)]">Final results</p>
-        <h2 className="mt-1 text-3xl font-semibold">The game is complete</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Here are the final scores and the identities revealed.
-        </p>
+    <section className="mx-auto mt-0 w-full">
+      <div className="mb-4 text-center">
+        <h2 className="mt-0 text-4xl font-semibold">The game is complete</h2>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
+      <div className="mx-75 overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
         {results.map((player, index) => (
           <div
             key={player.id}
-            className="flex flex-wrap items-center gap-4 border-b border-[var(--line)] p-4 last:border-b-0"
+            className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] p-2 last:border-b-0"
           >
             <span className="w-6 text-center text-lg font-semibold text-[var(--muted)]">
               {index + 1}
@@ -62,10 +56,6 @@ export function FinalPanel({
             <div className="text-right">
               <p className="text-2xl font-bold">{player.score}</p>
               <p className="text-xs text-[var(--muted)]">final score</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Correctly guessed {correctGuessCounts[player.id] ?? 0}{" "}
-                {correctGuessCounts[player.id] === 1 ? "time" : "times"}
-              </p>
             </div>
           </div>
         ))}
