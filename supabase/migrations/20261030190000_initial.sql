@@ -62,6 +62,7 @@ create table public.rounds (
   round_number integer not null check (round_number > 0),
   status public.round_status not null default 'active',
   finalized_at timestamptz,
+  results_sent_at timestamptz,
   unique (game_code, round_number),
   check (
     (status = 'active' and finalized_at is null)

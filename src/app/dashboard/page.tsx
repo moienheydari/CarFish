@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { Fragment } from "react";
 import { requireUser, getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -9,7 +10,7 @@ import { IntroductionPanel } from "@/components/introduction-panel";
 import { VotePanel } from "@/components/vote-panel";
 import { FinalPanel } from "@/components/final-panel";
 import { GamePhaseSync } from "@/components/game-phase-sync";
-import type { Chat, GamePhase, Profile, Vote } from "@/types/database";
+import type { Chat, GamePhase, Profile, Round, Vote } from "@/types/database";
 
 export const instant = false;
 
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
   const profileColumns =
     "id,real_name,display_name,profile_image_url,job,age,bio,is_gm,is_decoy,score,current_score,game_code,created_at,updated_at";
 
-  const [{ data: game }, { data: initialChatRows }, { data: profiles }, { data: activeRound }, { data: userMemberships }] =
+  const [{ data: game }, { data: initialChatRows }, { data: profiles }, { data: roundRows }, { data: userMemberships }] =
     await Promise.all([
       supabase
         .from("games")
@@ -55,17 +56,23 @@ export default async function DashboardPage() {
         .from("rounds")
         .select("id,game_code,round_number,status,finalized_at")
         .eq("game_code", profile.game_code)
-        .eq("status", "active")
-        .maybeSingle(),
+        .order("round_number", { ascending: false }),
       supabase
         .from("chat_members")
         .select("chat_id,user_id")
         .eq("user_id", user.id),
     ]);
+  const rounds = (roundRows ?? []) as Round[];
+  const activeRound = rounds.find((round) => round.status === "active") ?? null;
   const chatRows = initialChatRows;
 
   const players = (profiles ?? []).filter((item) => !item.is_gm);
   const userChatIds = (userMemberships ?? []).map((membership) => membership.chat_id);
+  const votesQuery = supabase
+    .from("votes")
+    .select("id,game_code,round_id,voter_id,target_id,guess,status,vote_kind,created_at,updated_at")
+    .eq("game_code", profile.game_code);
+  if (!profile.is_gm) votesQuery.eq("round_id", activeRound?.id ?? "");
   const [{ data: userChats }, { data: votes }, { data: finalGuessCounts }] =
     await Promise.all([
       userChatIds.length
@@ -74,11 +81,7 @@ export default async function DashboardPage() {
           .select("chat_id,user_id")
           .in("chat_id", userChatIds)
         : Promise.resolve({ data: [] as { chat_id: string; user_id: string }[] }),
-      supabase
-        .from("votes")
-        .select("id,game_code,round_id,voter_id,target_id,guess,status,vote_kind,created_at,updated_at")
-        .eq("game_code", profile.game_code)
-        .eq("round_id", activeRound?.id ?? ""),
+      votesQuery,
       game?.phase === "final"
         ? supabase.rpc("get_final_guess_counts", {
           p_game_code: profile.game_code,
@@ -122,12 +125,14 @@ export default async function DashboardPage() {
             chats={chats}
             currentUserId={user.id}
             gameCode={profile.game_code}
+            roundId={activeRound?.id ?? ""}
+            rounds={rounds}
             initialPhase={(game?.phase ?? "not_started") as GamePhase}
             initialAllowPrivateChats={game?.allow_private_chats ?? true}
             mentionableProfiles={(profiles ?? []) as Profile[]}
           />
         ) : (
-          <>
+          <Fragment key={game?.phase}>
             {game?.phase === "not_started" ? (
               <>
                 <IntroductionPanel
@@ -173,7 +178,7 @@ export default async function DashboardPage() {
                 )}
               </>
             )}
-          </>
+          </Fragment>
         )}
       </GamePhaseSync>
     </main>

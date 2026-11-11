@@ -37,17 +37,17 @@ export async function POST(
     .eq("game_code", gameCode)
     .eq("round_id", round.id)
     .eq("voter_id", user.id)
-    .eq("vote_kind", voteKind)
-    .eq("status", "pending")
-    .order("updated_at", { ascending: false })
-    .limit(1);
-  if (voteKind === "guess")
-    existingVoteQuery = existingVoteQuery.eq("target_id", parsed.data.target_id);
-  const { data: existingVote } = await existingVoteQuery.maybeSingle();
-  if (existingVote)
+    .eq("target_id", parsed.data.target_id)
+    .maybeSingle();
+  const { data: existingVote, error: existingVoteError } = await existingVoteQuery;
+  if (existingVoteError) {
+    console.error("Vote lookup failed:", existingVoteError.code, existingVoteError.message);
+    return NextResponse.json({ error: "Could not lock this guess." }, { status: 400 });
+  }
+  if (existingVote?.status === "pending")
     return NextResponse.json({ error: "This guess is already locked." }, { status: 409 });
 
-  const { data, error } = await supabase.from("votes").insert({
+  const { data, error } = await supabase.from("votes").upsert({
       game_code: gameCode,
       round_id: round.id,
       voter_id: user.id,
@@ -55,7 +55,7 @@ export async function POST(
       guess: voteKind === "decoy_favorite" ? "favorite" : parsed.data.guess,
       vote_kind: voteKind,
       status: "pending",
-    }).select("id").single();
+    }, { onConflict: "game_code,voter_id,target_id,round_id" }).select("id").single();
   if (error) {
     console.error("Vote lock failed:", error.code, error.message);
     return NextResponse.json({ error: "Could not lock this guess." }, { status: 400 });
@@ -81,11 +81,21 @@ export async function PATCH(
   if (!profile?.is_gm || profile.game_code !== gameCode)
     return NextResponse.json({ error: "Only the game master can review votes." }, { status: 403 });
 
+  const { data: activeRound, error: activeRoundError } = await supabase
+    .from("rounds")
+    .select("id")
+    .eq("game_code", gameCode)
+    .eq("status", "active")
+    .maybeSingle();
+  if (activeRoundError || !activeRound)
+    return NextResponse.json({ error: "No active round is available." }, { status: 409 });
+
   const { error } = await supabase
     .from("votes")
     .update({ status: parsed.data.status })
     .eq("id", parsed.data.vote_id)
-    .eq("game_code", gameCode);
+    .eq("game_code", gameCode)
+    .eq("round_id", activeRound.id);
   if (error) {
     console.error("Vote review failed:", error.code, error.message);
     return NextResponse.json({ error: "Could not update this vote." }, { status: 400 });

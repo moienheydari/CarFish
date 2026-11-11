@@ -43,9 +43,10 @@ export function VotePanel({
       .from("votes")
       .select("*")
       .eq("game_code", gameCode)
+      .eq("round_id", roundId)
       .eq("voter_id", currentUserId);
     if (!fetchError && data) setVotes(data as Vote[]);
-  }, [currentUserId, gameCode]);
+  }, [currentUserId, gameCode, roundId]);
   const configure = useCallback(
     (channel: RealtimeChannel) =>
       channel.on(
@@ -59,6 +60,7 @@ export function VotePanel({
             return;
           }
           if (incoming.voter_id !== currentUserId) return;
+          if (incoming.round_id !== roundId) return;
           setVotes((current) => [
             ...current.filter((vote) => vote.id !== incoming.id),
             incoming,
@@ -71,7 +73,7 @@ export function VotePanel({
             setGuesses((current) => ({ ...current, [incoming.target_id]: incoming.guess }));
         },
       ),
-    [currentUserId, gameCode],
+    [currentUserId, gameCode, roundId],
   );
   useRealtimeChannel(`game-votes-${gameCode}`, configure, (status) => {
     if (status === "SUBSCRIBED") void reconcileVotes();
@@ -102,7 +104,10 @@ export function VotePanel({
         return;
       }
       setVotes((current) => [
-        ...current.filter((vote) => vote.target_id !== targetId),
+        ...current.filter((vote) => !(
+          vote.round_id === roundId
+          && vote.target_id === targetId
+        )),
         {
           id: result.id ?? crypto.randomUUID(),
           game_code: gameCode,

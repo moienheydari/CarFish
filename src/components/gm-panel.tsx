@@ -8,7 +8,7 @@ import {
   markChatRead,
   useUnreadChatCounts,
 } from "@/hooks/use-unread-chat-counts";
-import type { Chat, GamePhase, Profile, Vote, VoteStatus } from "@/types/database";
+import type { Chat, GamePhase, Profile, Round, Vote, VoteStatus } from "@/types/database";
 import { createClient } from "@/lib/supabase/browser";
 import { useRealtimeChannel } from "@/hooks/use-realtime-channel";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -18,6 +18,8 @@ export function GmPanel({
   chats,
   currentUserId,
   gameCode,
+  roundId,
+  rounds,
   initialPhase,
   votes,
   initialAllowPrivateChats,
@@ -27,6 +29,8 @@ export function GmPanel({
   chats: Chat[];
   currentUserId: string;
   gameCode: string;
+  roundId: string;
+  rounds: Round[];
   initialPhase: GamePhase;
   votes: Vote[];
   initialAllowPrivateChats: boolean;
@@ -39,6 +43,10 @@ export function GmPanel({
   const [allowPrivateChats, setAllowPrivateChats] = useState(initialAllowPrivateChats);
   const [reviewError, setReviewError] = useState("");
   const [reviewedVotes, setReviewedVotes] = useState(votes);
+  const [reviewingVoteIds, setReviewingVoteIds] = useState<Set<string>>(new Set());
+  const [selectedRoundId, setSelectedRoundId] = useState(
+    roundId || rounds[0]?.id || "",
+  );
   const [hiddenVoteIds, setHiddenVoteIds] = useState<Set<string>>(new Set());
   const [gameChatsState, setGameChatsState] = useState(chats);
   const [selectedChatId, setSelectedChatId] = useState(
@@ -126,8 +134,9 @@ export function GmPanel({
   const sortedGmChats = [...gmChats].sort(
     (left, right) => (unreadCounts[right.id] ?? 0) - (unreadCounts[left.id] ?? 0),
   );
+  const sortedRounds = [...rounds].sort((left, right) => right.round_number - left.round_number);
   const visibleVotes = reviewedVotes
-    .filter((vote) => !hiddenVoteIds.has(vote.id))
+    .filter((vote) => vote.round_id === selectedRoundId && !hiddenVoteIds.has(vote.id))
     .sort((left, right) => {
       if (left.status === "pending" && right.status !== "pending") return -1;
       if (left.status !== "pending" && right.status === "pending") return 1;
@@ -205,6 +214,7 @@ export function GmPanel({
 
   async function reviewVote(voteId: string, status: VoteStatus) {
     setReviewError("");
+    setReviewingVoteIds((current) => new Set(current).add(voteId));
     try {
       const response = await fetch(`/api/games/${gameCode}/votes`, {
         method: "PATCH",
@@ -216,16 +226,24 @@ export function GmPanel({
       setReviewedVotes((current) =>
         current.map((vote) => vote.id === voteId ? { ...vote, status } : vote),
       );
-      if (status === "unlocked") {
-        setHiddenVoteIds((current) => new Set(current).add(voteId));
-      }
     } catch (caughtError) {
       setReviewError(caughtError instanceof Error ? caughtError.message : "Could not update vote.");
+    } finally {
+      setReviewingVoteIds((current) => {
+        const next = new Set(current);
+        next.delete(voteId);
+        return next;
+      });
     }
   }
 
   function clearDisplayedVotes() {
-    setHiddenVoteIds(new Set(reviewedVotes.map((vote) => vote.id)));
+    setHiddenVoteIds((current) => new Set([
+      ...current,
+      ...reviewedVotes
+        .filter((vote) => vote.round_id === selectedRoundId)
+        .map((vote) => vote.id),
+    ]));
   }
 
   return (
@@ -243,11 +261,28 @@ export function GmPanel({
             </button>
           )}
         </div>
+        <div className="mt-2 flex gap-1 overflow-x-auto pb-1">
+          {sortedRounds.reverse().map((round) => (
+            <button
+              key={round.id}
+              type="button"
+              onClick={() => setSelectedRoundId(round.id)}
+              aria-pressed={selectedRoundId === round.id}
+              className={`shrink-0 cursor-pointer rounded-xl border px-2 py-1 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${selectedRoundId === round.id
+                ? "border-[var(--accent)] bg-[#2a0a0a] text-white"
+                : "border-[var(--line)] hover:border-[var(--accent)]"
+                }`}
+            >
+              {round.round_number}
+            </button>
+          ))}
+        </div>
         <div className="mt-2 max-h-[20rem] space-y-0.5 overflow-y-auto pr-1">
           {visibleVotes.map((vote) => {
             const voter = players.find((player) => player.id === vote.voter_id);
             const target = players.find((player) => player.id === vote.target_id);
             const isDecoyFavorite = vote.vote_kind === "decoy_favorite";
+            const isReviewing = reviewingVoteIds.has(vote.id);
             return (
               <div key={vote.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line)] p-2 text-sm">
                 <span className="font-medium">{voter?.display_name ?? "Unknown"}</span>
@@ -255,24 +290,30 @@ export function GmPanel({
                 <span className="text-[var(--muted)]">guessed</span>
                 <span className="font-medium">{target?.display_name ?? "Unknown"}</span>
                 <span className="font-medium">({target?.real_name ?? "Unknown"})</span>
-                <span className="text-[var(--muted)]">as {vote.guess}</span>
+                <span className="text-[var(--muted)]">as </span>
+                <span className="font-medium">{vote.guess}</span>
+                <span className="text-[var(--muted)] text-xs"> |  {new Date(vote.updated_at).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                </span>
                 <span className="ml-auto rounded-full border border-[var(--line)] px-2 py-0.5 text-xs">
                   {vote.status}
                 </span>
                 <div className="flex gap-1">
                   {vote.status === "pending" && (
                     <>
-                      <button type="button" onClick={() => void reviewVote(vote.id, "correct")} className="cursor-pointer rounded-lg bg-emerald-700 px-2 py-0.5 text-xs transition hover:bg-emerald-600">Correct</button>
+                      <button type="button" disabled={isReviewing} onClick={() => void reviewVote(vote.id, "correct")} className="cursor-pointer rounded-lg bg-emerald-700 px-2 py-0.5 text-xs transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60">{isReviewing ? "Verifying..." : "Correct"}</button>
                       {!isDecoyFavorite && (
                         <>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "exists")} className="cursor-pointer rounded-lg bg-amber-700 px-2 py-0.5 text-xs transition hover:bg-amber-600">Exists</button>
-                          <button type="button" onClick={() => void reviewVote(vote.id, "none")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">None</button>
+                          <button type="button" disabled={isReviewing} onClick={() => void reviewVote(vote.id, "exists")} className="cursor-pointer rounded-lg bg-amber-700 px-2 py-0.5 text-xs transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60">{isReviewing ? "Verifying..." : "Exists"}</button>
+                          <button type="button" disabled={isReviewing} onClick={() => void reviewVote(vote.id, "none")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-60">{isReviewing ? "Verifying..." : "None"}</button>
                         </>
                       )}
                     </>
                   )}
                   {vote.status !== "unlocked" && (
-                    <button type="button" onClick={() => void reviewVote(vote.id, "unlocked")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a]">Unlock</button>
+                    <button type="button" disabled={isReviewing} onClick={() => void reviewVote(vote.id, "unlocked")} className="cursor-pointer rounded-lg border border-[var(--line)] px-2 py-0.5 text-xs transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-60">{isReviewing ? "Verifying..." : "Unlock"}</button>
                   )}
                 </div>
               </div>
@@ -306,12 +347,19 @@ export function GmPanel({
         </div>
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3">
           <label className="flex items-center justify-between gap-3 text-m font-semibold">
-            Game Phase
+            <span className="flex items-center gap-2">
+              Game Phase
+              {phaseBusy && (
+                <span className="animate-pulse text-xs font-normal text-[var(--muted)]">
+                  Changing...
+                </span>
+              )}
+            </span>
             <select
               value={phase}
               onChange={(event) => void changePhase(event.target.value as GamePhase)}
               disabled={phaseBusy}
-              className="rounded-lg border border-[var(--line)] bg-[#050505] px-2 py-1.5 text-sm font-normal outline-none focus:border-[var(--accent)]"
+              className="rounded-lg border border-[var(--line)] bg-[#050505] px-2 py-1.5 text-sm font-normal outline-none focus:border-[var(--accent)] disabled:cursor-wait disabled:opacity-60"
             >
               <option value="not_started">Not started</option>
               <option value="chat_phase">Chat phase</option>

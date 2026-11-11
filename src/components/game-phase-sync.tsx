@@ -24,7 +24,23 @@ export function GamePhaseSync({
             table: "games",
             filter: `game_code=eq.${gameCode}`,
           },
-          () => router.refresh(),
+          (payload) => {
+            router.refresh();
+            if (payload.new.phase === "chat_phase" || payload.new.phase === "final") {
+              window.setTimeout(() => {
+                void fetch(`/api/games/${gameCode}/round-results`, { method: "POST" })
+                  .then(async (response) => {
+                    if (!response.ok) {
+                      const result = await response.json() as { error?: string };
+                      throw new Error(result.error ?? "Could not send round results.");
+                    }
+                  })
+                  .catch((error: unknown) => {
+                    console.error("Round result message failed:", error);
+                  });
+              }, 3000);
+            }
+          },
         ),
     [gameCode, router],
   );
