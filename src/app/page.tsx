@@ -16,7 +16,7 @@ export default async function Home() {
           <h1 className="max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-7xl">
             Car<span className="text-[var(--accent)]">Fish</span>
           </h1>
-          <p className="ml-3 mt-0 max-w-xl text-sm leading-8 text-[var(--muted)]">
+          <p className="ml-3 mt-0 max-w-xl text-xs leading-8 text-[var(--muted)]">
             Inspired by the show GameChanger.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
@@ -24,7 +24,7 @@ export default async function Home() {
               href={user ? "/dashboard" : "/login"}
               className="rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#050505] transition hover:bg-white"
             >
-              {user ? "Open dashboard" : "Login"}{" "}
+              Let's Play!
               <span aria-hidden>→</span>
             </Link>
           </div>
