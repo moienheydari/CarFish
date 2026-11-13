@@ -280,7 +280,7 @@ export function ProfileForm({ profile }: { profile: Profile | null }) {
         <button
           type="button"
           onClick={() => setCreateGameOpen(true)}
-          disabled={busy || gameCode.length !== 4}
+          disabled={true}
           className="cursor-pointer rounded-xl border border-[var(--line)] px-5 py-3 font-semibold transition hover:border-[var(--accent)] hover:bg-[#2a0a0a] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Create
