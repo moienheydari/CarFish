@@ -25,7 +25,6 @@ export default async function Home() {
               className="rounded-full bg-[var(--accent)] px-6 py-3 font-semibold text-[#050505] transition hover:bg-white"
             >
               Let's Play!
-              <span aria-hidden>→</span>
             </Link>
           </div>
         </section>
