@@ -330,23 +330,23 @@ export function ChatBox({
                       <Image
                         src={message.sender.profile_image_url}
                         alt=""
-                        width={32}
-                        height={32}
+                        width={40}
+                        height={40}
                         unoptimized
-                        className="h-8 w-8 shrink-0 rounded-full object-cover"
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
                       />
                     ) : (
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-[11px] font-semibold text-[var(--accent)]">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-xs font-semibold text-[var(--accent)]">
                         {(message.sender?.display_name || "?").slice(0, 1).toUpperCase()}
                       </span>
                     )
                   ) : (
-                    <span className="w-8 shrink-0" aria-hidden />
+                    <span className="w-10 shrink-0" aria-hidden />
                   )
                 )}
                 <div className={isOwnMessage ? "min-w-0 flex-1 text-right" : "min-w-0 flex-1"}>
                   {isFirstFromSender && (
-                    <p className={`text-[12px] text-[var(--accent)] ${isOwnMessage ? "text-right" : ""}`}>
+                    <p className={`text-sm text-[var(--accent)] ${isOwnMessage ? "text-right" : ""}`}>
                       {message.sender?.display_name || "participant"}
                     </p>
                   )}
