@@ -330,13 +330,13 @@ export function ChatBox({
                       <Image
                         src={message.sender.profile_image_url}
                         alt=""
-                        width={40}
-                        height={40}
+                        width={50}
+                        height={50}
                         unoptimized
-                        className="h-10 w-10 shrink-0 rounded-full object-cover"
+                        className="h-12 w-12 shrink-0 rounded-full object-cover"
                       />
                     ) : (
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-xs font-semibold text-[var(--accent)]">
+                      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#2a0a0a] text-sm font-semibold text-[var(--accent)]">
                         {(message.sender?.display_name || "?").slice(0, 1).toUpperCase()}
                       </span>
                     )
@@ -346,7 +346,7 @@ export function ChatBox({
                 )}
                 <div className={isOwnMessage ? "min-w-0 flex-1 text-right" : "min-w-0 flex-1"}>
                   {isFirstFromSender && (
-                    <p className={`text-sm text-[var(--accent)] ${isOwnMessage ? "text-right" : ""}`}>
+                    <p className={`text-[16px] text-[var(--accent)] ${isOwnMessage ? "text-right" : ""}`}>
                       {message.sender?.display_name || "participant"}
                     </p>
                   )}
