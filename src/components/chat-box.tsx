@@ -43,7 +43,7 @@ export function ChatBox({
       .filter((profile) =>
         profile.display_name!.toLocaleLowerCase().startsWith(mentionContext.query.toLocaleLowerCase()),
       )
-      .slice(0, 6)
+      .slice(0, 10) // the first 10 people
     : [];
 
   useEffect(() => {
@@ -191,7 +191,8 @@ export function ChatBox({
       if (!response.ok) throw new Error(result.error ?? "Could not send message.");
       setMessages((old) => mergeMessages(old, [result as Message]));
       setContent("");
-      window.requestAnimationFrame(() => inputRef.current?.focus());
+      // Focus to Text Area after send:
+      // window.requestAnimationFrame(() => inputRef.current?.focus());
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not send message.");
     } finally {
